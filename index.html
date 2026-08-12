@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>찾았닷! - 교내 실시간 분실물 센터</title>
+    <title>FIND IT! - 교내 실시간 분실물 센터</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -684,6 +684,13 @@
                 activeBtn.classList.add('bg-white', 'text-brand-blue', 'shadow-xs', 'font-semibold');
                 activeBtn.classList.remove('text-slate-600', 'font-medium');
             }
+
+            if (tabName === 'my') {
+                renderMyItems();
+            } else if (tabName === 'map') {
+                updateLocationCounts();
+            }
+        }
 
         // 이미지 클라이언트 측 고화질 압축 함수 (Canvas API 기반)
         function compressImage(file, maxWidth = 1200, maxHeight = 1200, quality = 0.85) {
