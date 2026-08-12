@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>찾았닷! - 교내 실시간 분실물 센터</title>
+    <title>FIND IT! - 교내 실시간 분실물 센터</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -90,7 +90,7 @@
                 </div>
                 <div>
                     <h1 class="font-bold text-base leading-tight text-slate-900 flex items-center gap-2">
-                        찾았닷!
+                        FIND IT!
                         <span class="text-[10px] bg-slate-100 text-slate-600 font-semibold px-2 py-0.5 rounded-full border border-slate-200">교내 분실물 센터</span>
                     </h1>
                 </div>
@@ -368,6 +368,17 @@
                         <div class="font-bold text-xs text-slate-800 group-hover:text-brand-blue">운동장</div>
                         <div class="text-[10px] text-slate-400 mt-0.5">스탠드, 축구장</div>
                     </button>
+
+                    <button onclick="filterByLocation('기타')" class="p-3 rounded-2xl border border-slate-200 hover:border-brand-blue hover:bg-blue-50/50 text-left transition group">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="w-8 h-8 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center text-sm group-hover:scale-105 transition">
+                                <i class="fa-solid fa-location-arrow"></i>
+                            </div>
+                            <span class="text-xs bg-slate-100 group-hover:bg-blue-100 text-slate-600 group-hover:text-brand-blue font-bold px-2 py-0.5 rounded-full" id="count-loc-기타">0</span>
+                        </div>
+                        <div class="font-bold text-xs text-slate-800 group-hover:text-brand-blue">기타 장소</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5">기타 교내 구역</div>
+                    </button>
                 </div>
             </div>
         </section>
@@ -558,10 +569,26 @@
         }
 
         function loadMyItemIds() {
-            const savedMyIds = localStorage.getItem('foundit_my_items');
+            const savedMyIds = localStorage.getItem('findit_my_items');
             if (savedMyIds) {
                 try { myItemIds = new Set(JSON.parse(savedMyIds)); } catch(e) {}
             }
+        }
+
+        function saveMyItemIds() {
+            localStorage.setItem('findit_my_items', JSON.stringify([...myItemIds]));
+        }
+
+        function loadMyCommentIds() {
+            const savedCommentIds = localStorage.getItem('findit_my_comments');
+            if (savedCommentIds) {
+                try { myCommentIds = new Set(JSON.parse(savedCommentIds)); } catch(e) {}
+            }
+        }
+
+        function saveMyCommentIds() {
+            localStorage.setItem('findit_my_comments', JSON.stringify([...myCommentIds]));
+        }
         }
 
         function saveMyItemIds() {
@@ -1141,113 +1168,13 @@
                 return;
             }
 
-            list.innerHTML = comments.map(c => {
-                const isMyComment = myCommentIds.has(String(c.id));
-                return `
-                    <div class="bg-slate-50 p-2 rounded-lg flex justify-between items-center border border-slate-100 group">
-                        <span class="text-slate-700 font-medium text-xs break-all flex-1 pr-2">${escapeHtml(c.text)}</span>
-                        <div class="flex items-center gap-2 shrink-0">
-                            <span class="text-[10px] text-slate-400 whitespace-nowrap">${c.time || '방금 전'}</span>
-                            ${isMyComment ? `
-                                <button onclick="deleteComment('${c.id}')" class="text-slate-300 hover:text-rose-500 p-1 transition" title="내 댓글 삭제">
-                                    <i class="fa-solid fa-trash-can text-[11px]"></i>
-                                </button>
-                            ` : ''}
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
-
-        async function addComment() {
-            const input = document.getElementById('commentInput');
-            const text = input.value.trim();
-            if (!text || !currentDetailItemId) return;
-
-            const item = items.find(i => String(i.id) === String(currentDetailItemId));
-            if (item) {
-                if (!item.comments) item.comments = [];
-                
-                const newCommentId = 'c-' + Date.now();
-                const newComment = { id: newCommentId, text: text, time: '방금 전' };
-                item.comments.push(newComment);
-
-                myCommentIds.add(newCommentId);
-                saveMyCommentIds();
-
-                if (supabaseClient) {
-                    try {
-                        await supabaseClient
-                            .from('lost_items')
-                            .update({ comments: item.comments })
-                            .eq('id', currentDetailItemId);
-                    } catch(e) {
-                        console.warn('Supabase comment add error:', e);
-                    }
-                }
-
-                localStorage.setItem('foundit_items', JSON.stringify(items));
-                renderComments(item);
-                input.value = '';
-                showToast('댓글 제보가 등록되었습니다.');
-            }
-        }
-
-        async function deleteComment(commentId) {
-            if (!currentDetailItemId) return;
-
-            const item = items.find(i => String(i.id) === String(currentDetailItemId));
-            if (item && item.comments) {
-                item.comments = item.comments.filter(c => String(c.id) !== String(commentId));
-                myCommentIds.delete(String(commentId));
-                saveMyCommentIds();
-
-                if (supabaseClient) {
-                    try {
-                        await supabaseClient
-                            .from('lost_items')
-                            .update({ comments: item.comments })
-                            .eq('id', currentDetailItemId);
-                    } catch(e) {
-                        console.warn('Supabase comment delete error:', e);
-                    }
-                }
-
-                localStorage.setItem('foundit_items', JSON.stringify(items));
-                renderComments(item);
-                showToast('댓글이 삭제되었습니다.');
-            }
-        }
-
-        function renderMyItems() {
-            const grid = document.getElementById('myItemsGrid');
-            const myItems = items.filter(i => myItemIds.has(String(i.id)));
-
-            if (myItems.length === 0) {
-                grid.innerHTML = `<div class="text-center py-8 text-slate-400 text-xs">내가 등록한 습득물이 없습니다.</div>`;
-                return;
-            }
-
-            grid.innerHTML = myItems.map(item => `
-                <div class="bg-slate-50 border border-slate-200/80 rounded-xl p-3 flex items-center justify-between gap-3 hover:bg-slate-100/50 transition">
-                    <div class="flex items-center gap-3 min-w-0 flex-1">
-                        <img src="${item.imageUrl}" class="w-12 h-12 rounded-lg object-cover bg-slate-200">
-                        <div class="min-w-0 flex-1">
-                            <div class="flex items-center gap-1.5 mb-0.5">
-                                <span class="text-[10px] px-1.5 py-0.2 rounded font-bold ${item.resolved ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">
-                                    ${item.resolved ? '습득함 (주인 찾음)' : '분실물 (찾는 중)'}
-                                </span>
-                                <span class="text-[11px] text-slate-400">${item.date}</span>
-                            </div>
-                            <h4 class="text-xs font-bold text-slate-800 truncate">${escapeHtml(item.title)}</h4>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-1.5">
-                        <button onclick="openDetailModal('${item.id}')" class="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50">
-                            보기
-                        </button>
-                        <button onclick="deleteMyItem('${item.id}')" class="p-1.5 text-slate-400 hover:text-rose-500 rounded-lg transition" title="삭제">
-                            <i class="fa-solid fa-trash-can text-xs"></i>
+            list.innerHTML = comments.map(c => `
+                <div class="bg-slate-50 p-2 rounded-lg flex justify-between items-center border border-slate-100 group">
+                    <span class="text-slate-700 font-medium text-xs break-all flex-1 pr-2">${escapeHtml(c.text)}</span>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <span class="text-[10px] text-slate-400 whitespace-nowrap">${c.time || '방금 전'}</span>
+                        <button onclick="deleteComment('${c.id}')" class="text-slate-300 hover:text-rose-500 p-1 transition" title="댓글 삭제">
+                            <i class="fa-solid fa-trash-can text-[11px]"></i>
                         </button>
                     </div>
                 </div>
@@ -1274,9 +1201,9 @@
         }
 
         function updateLocationCounts() {
-            const locs = ['본관', '신관', '도서관', '체육관', '급식실', '운동장'];
+            const locs = ['본관', '신관', '도서관', '체육관', '급식실', '운동장', '기타'];
             locs.forEach(loc => {
-                const count = items.filter(i => i.location === loc && !i.resolved).length;
+                const count = items.filter(i => (i.location === loc || (loc === '급식실' && i.location.includes('급식'))) && !i.resolved).length;
                 const el = document.getElementById(`count-loc-${loc}`);
                 if (el) el.textContent = count;
             });
@@ -1313,13 +1240,3 @@
     </script>
 </body>
 </html>
-```eoc
-
-### 주요 변경 사항
-
-1. **기본 필터 전환**: 앱에 처음 접속하면 **`분실물 (찾는 중)`** 탭이 기본으로 활성화되도록 초기 설정했습니다 (`activeTypeFilter = 'lost'`).
-2. **엄격한 상태 분리**:
-   - **`분실물 (찾는 중)`** 탭: 아직 주인을 찾지 못한 항목만 필터링되어 나타납니다 (`resolved === false`).
-   - **`습득함 (주인 찾음)`** 탭: 인계가 완료되어 주인을 찾은 항목만 모아서 보여줍니다 (`resolved === true`).
-   - **`전체 보기`** 탭: 주인을 찾은 물건과 찾는 물건을 상태 뱃지 구분과 함께 전체 조회할 수 있습니다.
-3. **상태 전환 반응 연동**: 상세 모달에서 `'주인 찾음 완료 처리'` 버튼을 누르면 해당 물건이 분실물 목록에서 즉시 사라져 **`습득함`** 탭으로 자동 이동됩니다.
