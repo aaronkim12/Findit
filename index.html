@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FIND IT - 교내 실시간 분실물 센터</title>
+    <title>찾았닷! - 교내 실시간 분실물 센터</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -232,11 +232,12 @@
                                     <i class="fa-solid fa-camera text-base"></i>
                                 </div>
                                 <p class="text-xs font-medium text-slate-700">사진 클릭하여 업로드</p>
-                                <p class="text-[11px] text-slate-400">JPG, PNG 지원 (Supabase Storage 연동)</p>
+                                <p class="text-[11px] text-slate-400">JPG, PNG 지원 (고화질 자동 압축 적용)</p>
                             </div>
 
                             <div id="previewContainer" class="hidden relative">
                                 <img id="imagePreview" src="" alt="미리보기" class="max-h-48 rounded-lg mx-auto object-cover shadow-xs">
+                                <span id="compressionInfo" class="hidden text-[10px] text-emerald-600 bg-emerald-50 border border-emerald-200 font-medium px-2 py-0.5 rounded-full inline-block mt-2"></span>
                                 <button type="button" onclick="removeImage(event)" class="absolute top-1 right-1 bg-slate-900/80 text-white w-7 h-7 rounded-full flex items-center justify-center text-xs hover:bg-rose-600 transition">
                                     <i class="fa-solid fa-xmark"></i>
                                 </button>
@@ -470,6 +471,9 @@
                     <button id="toggleStatusBtn" onclick="toggleItemStatusModal()" class="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl text-xs shadow-xs transition flex items-center justify-center gap-1.5">
                         <i class="fa-solid fa-check-double"></i> 주인 찾음 완료 처리
                     </button>
+                    <div id="noPermissionMsg" class="hidden flex-1 py-2.5 bg-slate-100 text-slate-400 font-medium rounded-xl text-xs text-center border border-slate-200 flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-lock text-slate-400"></i> 등록자만 완료 처리할 수 있습니다
+                    </div>
                 </div>
             </div>
         </div>
@@ -562,6 +566,11 @@
             loadMyItemIds();
             loadItems();
             setupRealtimeSubscription();
+
+            // 완료 후 1시간 지난 항목 자동 숨김을 위한 30초 주기 타이머
+            setInterval(() => {
+                applyFilters();
+            }, 30000);
         });
 
         function initCurrentDate() {
@@ -604,11 +613,20 @@
                             contact: item.contact,
                             imageUrl: item.image_url || getCategoryDefaultImg(item.category),
                             resolved: item.resolved || false,
+                            resolvedAt: item.resolved_at ? new Date(item.resolved_at).getTime() : null,
                             createdAt: item.created_at ? new Date(item.created_at).getTime() : Date.now(),
                             comments: item.comments || []
                         }));
                         applyFilters();
                         updateLocationCounts();
+
+                        // 상세 모달이 열려있는 상태라면 실시간으로 댓글 및 데이터 갱신
+                        if (currentDetailItemId) {
+                            const curItem = items.find(i => String(i.id) === String(currentDetailItemId));
+                            if (curItem) {
+                                renderComments(curItem);
+                            }
+                        }
                         return;
                     } else if (error) {
                         console.warn('Supabase lost_items table error/not created yet:', error.message);
@@ -667,24 +685,107 @@
                 activeBtn.classList.remove('text-slate-600', 'font-medium');
             }
 
-            if (tabName === 'my') renderMyItems();
-            if (tabName === 'feed') applyFilters();
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+        // 이미지 클라이언트 측 고화질 압축 함수 (Canvas API 기반)
+        function compressImage(file, maxWidth = 1200, maxHeight = 1200, quality = 0.85) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        let width = img.width;
+                        let height = img.height;
+
+                        if (width > maxWidth || height > maxHeight) {
+                            if (width / height > maxWidth / maxHeight) {
+                                height = Math.round((height * maxWidth) / width);
+                                width = maxWidth;
+                            } else {
+                                width = Math.round((width * maxHeight) / height);
+                                height = maxHeight;
+                            }
+                        }
+
+                        const canvas = document.createElement('canvas');
+                        canvas.width = width;
+                        canvas.height = height;
+
+                        const ctx = canvas.getContext('2d');
+                        ctx.imageSmoothingEnabled = true;
+                        ctx.imageSmoothingQuality = 'high';
+                        ctx.drawImage(img, 0, 0, width, height);
+
+                        canvas.toBlob((blob) => {
+                            if (!blob) {
+                                resolve({ blob: file, dataUrl: e.target.result, origSize: file.size, compSize: file.size });
+                                return;
+                            }
+                            const compressedFile = new File([blob], file.name.replace(/\.[^/.]+$/, ".jpg"), {
+                                type: 'image/jpeg',
+                                lastModified: Date.now()
+                            });
+                            const dataUrl = canvas.toDataURL('image/jpeg', quality);
+                            resolve({
+                                blob: compressedFile,
+                                dataUrl: dataUrl,
+                                origSize: file.size,
+                                compSize: blob.size
+                            });
+                        }, 'image/jpeg', quality);
+                    };
+                    img.onerror = (err) => reject(err);
+                    img.src = e.target.result;
+                };
+                reader.onerror = (err) => reject(err);
+                reader.readAsDataURL(file);
+            });
         }
 
-        function previewImage(event) {
+        async function previewImage(event) {
             const file = event.target.files[0];
             if (!file) return;
 
-            selectedFileObj = file;
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                selectedImageBase64 = e.target.result;
+            const placeholder = document.getElementById('uploadPlaceholder');
+            placeholder.innerHTML = `<div class="py-2 text-brand-blue text-xs font-semibold flex items-center justify-center gap-2"><i class="fa-solid fa-spinner fa-spin"></i> 이미지 고화질 최적화 중...</div>`;
+
+            try {
+                const result = await compressImage(file, 1200, 1200, 0.85);
+                selectedFileObj = result.blob;
+                selectedImageBase64 = result.dataUrl;
+
                 document.getElementById('imagePreview').src = selectedImageBase64;
                 document.getElementById('previewContainer').classList.remove('hidden');
-                document.getElementById('uploadPlaceholder').classList.add('hidden');
-            };
-            reader.readAsDataURL(file);
+                placeholder.classList.add('hidden');
+
+                // 압축율 계산 및 사용자 안내
+                const origMb = (result.origSize / (1024 * 1024)).toFixed(2);
+                const compKb = (result.compSize / 1024).toFixed(0);
+                const savedPercent = Math.max(0, Math.round((1 - result.compSize / result.origSize) * 100));
+
+                const infoEl = document.getElementById('compressionInfo');
+                if (infoEl) {
+                    infoEl.textContent = `⚡ 이미지 최적화 완료: ${origMb}MB → ${compKb}KB (${savedPercent}% 용량 절감)`;
+                    infoEl.classList.remove('hidden');
+                }
+            } catch (e) {
+                console.warn('Image compression failed, fallback to original:', e);
+                selectedFileObj = file;
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    selectedImageBase64 = e.target.result;
+                    document.getElementById('imagePreview').src = selectedImageBase64;
+                    document.getElementById('previewContainer').classList.remove('hidden');
+                    placeholder.classList.add('hidden');
+                };
+                reader.readAsDataURL(file);
+            } finally {
+                placeholder.innerHTML = `
+                    <div class="w-10 h-10 bg-blue-50 text-brand-blue rounded-full flex items-center justify-center mx-auto mb-1">
+                        <i class="fa-solid fa-camera text-base"></i>
+                    </div>
+                    <p class="text-xs font-medium text-slate-700">사진 클릭하여 업로드</p>
+                    <p class="text-[11px] text-slate-400">JPG, PNG 지원 (고화질 자동 압축 적용)</p>
+                `;
+            }
         }
 
         function removeImage(event) {
@@ -858,7 +959,15 @@
                 else clearBtn.classList.add('hidden');
             }
 
+            const ONE_HOUR_MS = 60 * 60 * 1000;
+            const now = Date.now();
+
             const filtered = items.filter(item => {
+                // 1시간 뒤 자동 숨김 처리: 완료 상태이고 처리 시각부터 1시간(3600초)이 경과했다면 피드에서 자동 제외
+                if (item.resolved && item.resolvedAt && (now - item.resolvedAt > ONE_HOUR_MS)) {
+                    return false;
+                }
+
                 if (activeTypeFilter !== 'all' && item.type !== activeTypeFilter) return false;
                 if (activeCategoryFilter !== 'all' && item.category !== activeCategoryFilter) return false;
                 if (hideResolved && item.resolved) return false;
@@ -973,13 +1082,25 @@
                 badge.innerHTML = '<i class="fa-solid fa-circle-question text-[11px]"></i> 분실물';
             }
 
+            // 본인 작성글 판단 및 완료 버튼 처리
+            const isOwner = myItemIds.has(String(item.id));
             const toggleBtn = document.getElementById('toggleStatusBtn');
-            if (item.resolved) {
-                toggleBtn.className = 'flex-1 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs transition flex items-center justify-center gap-1.5';
-                toggleBtn.innerHTML = '<i class="fa-solid fa-rotate-left"></i> 찾음 완료 취소하기';
+            const noPermMsg = document.getElementById('noPermissionMsg');
+
+            if (isOwner) {
+                toggleBtn.classList.remove('hidden');
+                if (noPermMsg) noPermMsg.classList.add('hidden');
+
+                if (item.resolved) {
+                    toggleBtn.className = 'flex-1 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs transition flex items-center justify-center gap-1.5';
+                    toggleBtn.innerHTML = '<i class="fa-solid fa-rotate-left"></i> 찾음 완료 취소하기';
+                } else {
+                    toggleBtn.className = 'flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl text-xs shadow-xs transition flex items-center justify-center gap-1.5';
+                    toggleBtn.innerHTML = '<i class="fa-solid fa-check-double"></i> 주인 찾음 완료 처리';
+                }
             } else {
-                toggleBtn.className = 'flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl text-xs shadow-xs transition flex items-center justify-center gap-1.5';
-                toggleBtn.innerHTML = '<i class="fa-solid fa-check-double"></i> 주인 찾음 완료 처리';
+                toggleBtn.classList.add('hidden');
+                if (noPermMsg) noPermMsg.classList.remove('hidden');
             }
 
             renderComments(item);
@@ -988,21 +1109,39 @@
 
         async function toggleItemStatusModal() {
             if (!currentDetailItemId) return;
+
+            // 작성자 권한 검증
+            if (!myItemIds.has(String(currentDetailItemId))) {
+                showToast('등록자 본인만 완료 처리할 수 있습니다.');
+                return;
+            }
+
             const item = items.find(i => String(i.id) === String(currentDetailItemId));
             if (item) {
                 const newStatus = !item.resolved;
+                const resolvedAtIso = newStatus ? new Date().toISOString() : null;
+
                 item.resolved = newStatus;
+                item.resolvedAt = newStatus ? Date.now() : null;
 
                 if (supabaseClient) {
-                    await supabaseClient
-                        .from('lost_items')
-                        .update({ resolved: newStatus })
-                        .eq('id', currentDetailItemId);
+                    try {
+                        await supabaseClient
+                            .from('lost_items')
+                            .update({ 
+                                resolved: newStatus,
+                                resolved_at: resolvedAtIso
+                            })
+                            .eq('id', currentDetailItemId);
+                    } catch(e) {
+                        console.warn('Supabase update failed:', e);
+                    }
                 }
 
+                localStorage.setItem('foundit_items', JSON.stringify(items));
                 openDetailModal(currentDetailItemId);
                 applyFilters();
-                showToast(newStatus ? '주인 찾음 완료로 변경되었습니다.' : '찾음 상태가 취소되었습니다.');
+                showToast(newStatus ? '주인 찾음 완료로 변경되었습니다. (1시간 뒤 피드에서 자동 삭제)' : '찾음 상태가 취소되었습니다.');
             }
         }
 
