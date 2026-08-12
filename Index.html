@@ -1,0 +1,2192 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>찾았닷! - 교내 실시간 분실물 센터</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            blue: '#2563EB',
+                            blueDark: '#1D4ED8',
+                            coral: '#F97316',
+                            coralHover: '#EA580C',
+                            bg: '#F8FAFC',
+                            text: '#0F172A'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Noto Sans KR -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Supabase JS Client v2 CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #F8FAFC;
+            color: #0F172A;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        @keyframes fadeInSlide {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .animate-view {
+            animation: fadeInSlide 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        @keyframes modalPop {
+            from {
+                opacity: 0;
+                transform: scale(0.95) translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+        .animate-modal {
+            animation: modalPop 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .pulse-badge {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .4; }
+        }
+    </style>
+</head>
+<body class="bg-brand-bg text-brand-text min-h-screen flex flex-col justify-between selection:bg-blue-100 selection:text-blue-600">
+
+    <header class="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200/80 shadow-sm">
+        <div class="max-w-md md:max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center space-x-2.5 cursor-pointer" onclick="switchTab('feed')">
+                <div class="bg-brand-blue text-white w-9 h-9 rounded-xl flex items-center justify-center text-lg font-bold shadow-sm shadow-blue-200">
+                    <i class="fa-solid fa-magnifying-glass-location"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-base leading-tight text-slate-900 flex items-center gap-2">
+                        찾았닷!
+                        <span class="text-[10px] bg-slate-100 text-slate-600 font-semibold px-2 py-0.5 rounded-full border border-slate-200">교내 분실물 센터</span>
+                    </h1>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <div class="hidden sm:flex items-center gap-1.5 bg-slate-100/80 px-2.5 py-1 rounded-lg text-xs text-slate-600">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 pulse-badge"></span>
+                    <span>오늘 등록 <strong id="todayCount" class="text-brand-blue">0</strong>건</span>
+                </div>
+
+                <button onclick="switchTab('upload')" class="bg-brand-coral hover:bg-brand-coralHover active:scale-95 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-sm transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-plus text-xs"></i>
+                    <span>물건 등록</span>
+                </button>
+
+                <button onclick="openModal('cloudModal')" class="p-2 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition" title="Supabase 연동 상태">
+                    <i class="fa-solid fa-cloud text-sm text-emerald-500" id="syncCloudIcon"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-md md:max-w-4xl mx-auto px-4 pt-4 pb-24 w-full flex-grow">
+
+        <div class="bg-slate-200/60 p-1 rounded-2xl mb-4 flex border border-slate-200 shadow-inner">
+            <button id="tabBtn-feed" onclick="switchTab('feed')" class="flex-1 py-2 text-xs font-semibold rounded-xl text-brand-blue bg-white shadow-sm transition-all duration-200 flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-layer-group"></i> 분실물 피드
+            </button>
+            <button id="tabBtn-map" onclick="switchTab('map')" class="flex-1 py-2 text-xs font-medium rounded-xl text-slate-600 hover:text-slate-900 transition-all duration-200 flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-map-pin"></i> 장소별 지도
+            </button>
+            <button id="tabBtn-my" onclick="switchTab('my')" class="flex-1 py-2 text-xs font-medium rounded-xl text-slate-600 hover:text-slate-900 transition-all duration-200 flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-clock-rotate-left"></i> 내 등록 내역
+            </button>
+        </div>
+
+        <section id="view-feed" class="animate-view space-y-3.5">
+            <div class="bg-white rounded-2xl p-3.5 shadow-sm border border-slate-200/70 space-y-3">
+                <div class="relative">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                    <input type="text" id="searchInput" oninput="applyFilters()" placeholder="물건명, 특이사항, 장소 검색..." class="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-brand-blue focus:bg-white transition">
+                    <button id="clearSearchBtn" onclick="clearSearch()" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                        <i class="fa-solid fa-circle-xmark text-xs"></i>
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-3 gap-1.5 text-xs font-medium bg-slate-100 p-1 rounded-xl">
+                    <button onclick="setTypeFilter('all')" id="filter-type-all" class="type-filter-btn py-1.5 rounded-lg bg-white text-slate-800 shadow-sm text-center font-semibold transition">
+                        전체 보기
+                    </button>
+                    <button onclick="setTypeFilter('found')" id="filter-type-found" class="type-filter-btn py-1.5 rounded-lg text-slate-600 hover:text-slate-900 text-center transition">
+                        <i class="fa-solid fa-hand-holding-heart text-emerald-500 mr-1"></i>습득물
+                    </button>
+                    <button onclick="setTypeFilter('lost')" id="filter-type-lost" class="type-filter-btn py-1.5 rounded-lg text-slate-600 hover:text-slate-900 text-center transition">
+                        <i class="fa-solid fa-circle-question text-rose-500 mr-1"></i>분실물
+                    </button>
+                </div>
+
+                <div class="flex items-center space-x-1.5 overflow-x-auto hide-scrollbar pt-0.5 text-xs">
+                    <button onclick="setCategoryFilter('all')" class="cat-pill active-cat-pill px-3 py-1.5 rounded-xl bg-slate-900 text-white font-medium whitespace-nowrap transition flex items-center gap-1.5" data-cat="all">
+                        <i class="fa-solid fa-border-all text-[11px]"></i> 전체
+                    </button>
+                    <button onclick="setCategoryFilter('전자기기')" class="cat-pill px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 font-medium whitespace-nowrap hover:bg-slate-200 transition flex items-center gap-1.5" data-cat="전자기기">
+                        <i class="fa-solid fa-laptop text-[11px]"></i> 전자기기
+                    </button>
+                    <button onclick="setCategoryFilter('지갑/카드')" class="cat-pill px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 font-medium whitespace-nowrap hover:bg-slate-200 transition flex items-center gap-1.5" data-cat="지갑/카드">
+                        <i class="fa-solid fa-wallet text-[11px]"></i> 지갑/카드
+                    </button>
+                    <button onclick="setCategoryFilter('의류/가방')" class="cat-pill px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 font-medium whitespace-nowrap hover:bg-slate-200 transition flex items-center gap-1.5" data-cat="의류/가방">
+                        <i class="fa-solid fa-shirt text-[11px]"></i> 의류/가방
+                    </button>
+                    <button onclick="setCategoryFilter('도서/문구')" class="cat-pill px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 font-medium whitespace-nowrap hover:bg-slate-200 transition flex items-center gap-1.5" data-cat="도서/문구">
+                        <i class="fa-solid fa-book text-[11px]"></i> 도서/문구
+                    </button>
+                    <button onclick="setCategoryFilter('기타')" class="cat-pill px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 font-medium whitespace-nowrap hover:bg-slate-200 transition flex items-center gap-1.5" data-cat="기타">
+                        <i class="fa-solid fa-box text-[11px]"></i> 기타
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex justify-between items-center text-xs text-slate-500 px-1 pt-1">
+                <span>조회된 물건 <strong id="resultCount" class="text-slate-900 font-bold">0</strong>개</span>
+                <label class="flex items-center gap-1.5 cursor-pointer select-none">
+                    <input type="checkbox" id="hideResolvedCheck" onchange="applyFilters()" class="rounded border-slate-300 text-brand-blue focus:ring-brand-blue w-3.5 h-3.5">
+                    <span>주인 찾음 완료 항목 제외</span>
+                </label>
+            </div>
+
+            <div id="itemsGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-3.5"></div>
+
+            <div id="emptyState" class="hidden text-center py-12 bg-white rounded-2xl border border-dashed border-slate-200 p-6">
+                <div class="w-12 h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-3 text-lg">
+                    <i class="fa-solid fa-box-open"></i>
+                </div>
+                <h3 class="font-bold text-slate-700 text-sm mb-1">등록된 물건이 없습니다</h3>
+                <p class="text-xs text-slate-400 mb-4">조건을 변경하거나 새로운 분실/습득물을 등록해 보세요.</p>
+                <button onclick="switchTab('upload')" class="bg-brand-blue text-white text-xs font-semibold px-4 py-2 rounded-xl shadow-sm hover:bg-brand-blueDark transition">
+                    물건 등록하기
+                </button>
+            </div>
+        </section>
+
+        <section id="view-upload" class="hidden animate-view">
+            <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/80">
+                <div class="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
+                    <h2 class="font-bold text-slate-900 text-base flex items-center gap-2">
+                        <i class="fa-solid fa-file-circle-plus text-brand-coral"></i> 분실 / 습득물 등록
+                    </h2>
+                    <span class="text-[11px] text-slate-400">* 표시 항목 필수</span>
+                </div>
+
+                <form id="uploadForm" onsubmit="handleFormSubmit(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">등록 구분 *</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <label class="cursor-pointer">
+                                <input type="radio" name="itemType" value="found" checked class="peer sr-only">
+                                <div class="p-3 text-center rounded-xl border border-slate-200 peer-checked:border-emerald-500 peer-checked:bg-emerald-50/60 peer-checked:text-emerald-700 font-semibold text-xs transition flex items-center justify-center gap-2">
+                                    <i class="fa-solid fa-hand-holding-heart text-emerald-500 text-sm"></i> 습득함 (주웠어요)
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="itemType" value="lost" class="peer sr-only">
+                                <div class="p-3 text-center rounded-xl border border-slate-200 peer-checked:border-rose-500 peer-checked:bg-rose-50/60 peer-checked:text-rose-700 font-semibold text-xs transition flex items-center justify-center gap-2">
+                                    <i class="fa-solid fa-circle-question text-rose-500 text-sm"></i> 분실함 (찾아요)
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">사진 첨부 (선택)</label>
+                        <div class="relative border-2 border-dashed border-slate-200 hover:border-slate-300 rounded-xl p-4 text-center hover:bg-slate-50/50 transition cursor-pointer" onclick="document.getElementById('imageInput').click()">
+                            <input type="file" id="imageInput" accept="image/*" onchange="previewImage(event)" class="hidden">
+                            
+                            <div id="uploadPlaceholder" class="space-y-1">
+                                <div class="w-10 h-10 bg-blue-50 text-brand-blue rounded-full flex items-center justify-center mx-auto mb-1">
+                                    <i class="fa-solid fa-camera text-base"></i>
+                                </div>
+                                <p class="text-xs font-medium text-slate-700">사진 클릭하여 업로드</p>
+                                <p class="text-[11px] text-slate-400">JPG, PNG 지원 (Supabase Storage 연동)</p>
+                            </div>
+
+                            <div id="previewContainer" class="hidden relative">
+                                <img id="imagePreview" src="" alt="미리보기" class="max-h-48 rounded-lg mx-auto object-cover shadow-sm">
+                                <button type="button" onclick="removeImage(event)" class="absolute top-1 right-1 bg-slate-900/80 text-white w-7 h-7 rounded-full flex items-center justify-center text-xs hover:bg-rose-600 transition">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="itemTitle" class="block text-xs font-semibold text-slate-700 mb-1">물건 제목 *</label>
+                        <input type="text" id="itemTitle" required placeholder="예: 검은색 에어팟 프로 2세대, 파란색 카드지갑" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-brand-blue focus:bg-white transition">
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label for="itemCategory" class="block text-xs font-semibold text-slate-700 mb-1">카테고리 *</label>
+                            <select id="itemCategory" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-brand-blue focus:bg-white transition">
+                                <option value="전자기기">전자기기</option>
+                                <option value="지갑/카드">지갑/카드</option>
+                                <option value="의류/가방">의류/가방</option>
+                                <option value="도서/문구">도서/문구</option>
+                                <option value="기타" selected>기타</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="itemLocation" class="block text-xs font-semibold text-slate-700 mb-1">발견 / 분실 장소 *</label>
+                            <select id="itemLocation" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-brand-blue focus:bg-white transition">
+                                <option value="본관">본관 (교무실/교실)</option>
+                                <option value="신관">신관 (실습실/과학실)</option>
+                                <option value="도서관">도서관 (열람실)</option>
+                                <option value="체육관">체육관 (강당)</option>
+                                <option value="급식실">급식실/매점</option>
+                                <option value="운동장">운동장/스탠드</option>
+                                <option value="기타">기타 장소</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label for="itemDate" class="block text-xs font-semibold text-slate-700 mb-1">일시 *</label>
+                            <input type="date" id="itemDate" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-brand-blue focus:bg-white transition">
+                        </div>
+                        <div>
+                            <label for="itemKeeper" class="block text-xs font-semibold text-slate-700 mb-1">현재 보관 위치 / 대처 *</label>
+                            <input type="text" id="itemKeeper" required placeholder="예: 2학년 교무실 보관 중, 학생회 전달" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-brand-blue focus:bg-white transition">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label for="itemDescription" class="block text-xs font-semibold text-slate-700 mb-1">상세 정보 및 특징</label>
+                        <textarea id="itemDescription" rows="3" placeholder="키링 종류, 내부 상태, 스크래치 등 주인 확인용 특징을 적어주세요." class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-brand-blue focus:bg-white transition"></textarea>
+                    </div>
+
+                    <div>
+                        <label for="itemContact" class="block text-xs font-semibold text-slate-700 mb-1">연락처 / 연락 방법 (선택)</label>
+                        <input type="text" id="itemContact" placeholder="예: 오픈채팅 링크, 전화번호 또는 교무실 방문" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-brand-blue focus:bg-white transition">
+                    </div>
+
+                    <div class="flex gap-2 pt-2">
+                        <button type="button" onclick="switchTab('feed')" class="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold rounded-xl text-xs transition">
+                            취소
+                        </button>
+                        <button type="submit" id="submitBtn" class="flex-1 py-3 bg-brand-coral hover:bg-brand-coralHover text-white font-bold rounded-xl text-xs shadow-sm transition flex items-center justify-center gap-1.5">
+                            <i class="fa-solid fa-check"></i> 등록하기
+                        </button>
+                    </div>
+
+                </form>
+            </div>
+        </section>
+
+        <section id="view-map" class="hidden animate-view space-y-3.5">
+            <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80">
+                <div class="mb-3">
+                    <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+                        <i class="fa-solid fa-map-location-dot text-brand-blue"></i> 교내 주요 구역별 현황
+                    </h3>
+                    <p class="text-xs text-slate-400 mt-0.5">장소 카드를 클릭하면 해당 위치의 분실/습득물을 빠르게 필터링합니다.</p>
+                </div>
+
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                    <button onclick="filterByLocation('본관')" class="p-3 rounded-2xl border border-slate-200 hover:border-brand-blue hover:bg-blue-50/50 text-left transition group">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="w-8 h-8 rounded-xl bg-blue-100 text-brand-blue flex items-center justify-center text-sm group-hover:scale-105 transition">
+                                <i class="fa-solid fa-school"></i>
+                            </div>
+                            <span class="text-xs bg-slate-100 group-hover:bg-blue-100 text-slate-600 group-hover:text-brand-blue font-bold px-2 py-0.5 rounded-full" id="count-loc-본관">0</span>
+                        </div>
+                        <div class="font-bold text-xs text-slate-800 group-hover:text-brand-blue">본관</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5">교무실, 일반 교실</div>
+                    </button>
+
+                    <button onclick="filterByLocation('신관')" class="p-3 rounded-2xl border border-slate-200 hover:border-brand-blue hover:bg-blue-50/50 text-left transition group">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center text-sm group-hover:scale-105 transition">
+                                <i class="fa-solid fa-building-columns"></i>
+                            </div>
+                            <span class="text-xs bg-slate-100 group-hover:bg-blue-100 text-slate-600 group-hover:text-brand-blue font-bold px-2 py-0.5 rounded-full" id="count-loc-신관">0</span>
+                        </div>
+                        <div class="font-bold text-xs text-slate-800 group-hover:text-brand-blue">신관</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5">과학실, 실습실</div>
+                    </button>
+
+                    <button onclick="filterByLocation('도서관')" class="p-3 rounded-2xl border border-slate-200 hover:border-brand-blue hover:bg-blue-50/50 text-left transition group">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="w-8 h-8 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center text-sm group-hover:scale-105 transition">
+                                <i class="fa-solid fa-book-open"></i>
+                            </div>
+                            <span class="text-xs bg-slate-100 group-hover:bg-blue-100 text-slate-600 group-hover:text-brand-blue font-bold px-2 py-0.5 rounded-full" id="count-loc-도서관">0</span>
+                        </div>
+                        <div class="font-bold text-xs text-slate-800 group-hover:text-brand-blue">도서관</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5">열람실, 자습실</div>
+                    </button>
+
+                    <button onclick="filterByLocation('체육관')" class="p-3 rounded-2xl border border-slate-200 hover:border-brand-blue hover:bg-blue-50/50 text-left transition group">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="w-8 h-8 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center text-sm group-hover:scale-105 transition">
+                                <i class="fa-solid fa-basketball"></i>
+                            </div>
+                            <span class="text-xs bg-slate-100 group-hover:bg-blue-100 text-slate-600 group-hover:text-brand-blue font-bold px-2 py-0.5 rounded-full" id="count-loc-체육관">0</span>
+                        </div>
+                        <div class="font-bold text-xs text-slate-800 group-hover:text-brand-blue">체육관</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5">강당, 탈의실</div>
+                    </button>
+
+                    <button onclick="filterByLocation('급식실')" class="p-3 rounded-2xl border border-slate-200 hover:border-brand-blue hover:bg-blue-50/50 text-left transition group">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-sm group-hover:scale-105 transition">
+                                <i class="fa-solid fa-utensils"></i>
+                            </div>
+                            <span class="text-xs bg-slate-100 group-hover:bg-blue-100 text-slate-600 group-hover:text-brand-blue font-bold px-2 py-0.5 rounded-full" id="count-loc-급식실">0</span>
+                        </div>
+                        <div class="font-bold text-xs text-slate-800 group-hover:text-brand-blue">급식실/매점</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5">식당 주변, 매점 앞</div>
+                    </button>
+
+                    <button onclick="filterByLocation('운동장')" class="p-3 rounded-2xl border border-slate-200 hover:border-brand-blue hover:bg-blue-50/50 text-left transition group">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="w-8 h-8 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center text-sm group-hover:scale-105 transition">
+                                <i class="fa-solid fa-futbol"></i>
+                            </div>
+                            <span class="text-xs bg-slate-100 group-hover:bg-blue-100 text-slate-600 group-hover:text-brand-blue font-bold px-2 py-0.5 rounded-full" id="count-loc-운동장">0</span>
+                        </div>
+                        <div class="font-bold text-xs text-slate-800 group-hover:text-brand-blue">운동장</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5">스탠드, 축구장</div>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <section id="view-my" class="hidden animate-view space-y-3.5">
+            <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80">
+                <div class="mb-3">
+                    <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+                        <i class="fa-solid fa-clock-rotate-left text-brand-blue"></i> 내가 등록한 내역
+                    </h3>
+                    <p class="text-xs text-slate-400 mt-0.5">주인을 찾았거나 인계가 완료되었다면 '완료 처리'로 변경해 주세요.</p>
+                </div>
+
+                <div id="myItemsGrid" class="space-y-2"></div>
+            </div>
+        </section>
+
+    </main>
+
+    <button onclick="switchTab('upload')" class="fixed bottom-6 right-6 z-30 bg-brand-coral hover:bg-brand-coralHover active:scale-90 text-white w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-all duration-200" title="물건 등록">
+        <i class="fa-solid fa-plus text-lg"></i>
+    </button>
+
+    <!-- Detail Item Modal -->
+    <div id="detailModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl animate-modal overflow-hidden">
+            <div class="relative bg-slate-100 min-h-[180px] flex items-center justify-center">
+                <img id="modalImg" src="" alt="상세 사진" class="w-full max-h-64 object-contain">
+                <button onclick="closeModal('detailModal')" class="absolute top-3 right-3 bg-slate-900/70 text-white w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-900 transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+                <span id="modalTypeBadge" class="absolute top-3 left-3 px-2.5 py-1 rounded-lg text-xs font-bold text-white shadow-sm">
+                    습득물
+                </span>
+            </div>
+
+            <div class="p-5 space-y-4">
+                <div>
+                    <div class="flex items-center gap-2 text-xs text-slate-400 mb-1">
+                        <span id="modalCategory" class="bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-medium">카테고리</span>
+                        <span>•</span>
+                        <span id="modalDate">2026-08-12</span>
+                    </div>
+                    <h2 id="modalTitle" class="text-base font-bold text-slate-900">물건 제목</h2>
+                </div>
+
+                <div class="bg-slate-50 rounded-xl p-3 space-y-2 text-xs border border-slate-100">
+                    <div class="flex items-start">
+                        <span class="w-20 font-semibold text-slate-500 flex items-center gap-1.5"><i class="fa-solid fa-location-dot text-rose-500 w-3"></i> 장소:</span>
+                        <span id="modalLocation" class="font-medium text-slate-800 flex-1">본관</span>
+                    </div>
+                    <div class="flex items-start">
+                        <span class="w-20 font-semibold text-slate-500 flex items-center gap-1.5"><i class="fa-solid fa-box-archive text-amber-500 w-3"></i> 보관:</span>
+                        <span id="modalKeeper" class="font-medium text-slate-800 flex-1">교무실</span>
+                    </div>
+                    <div class="flex items-start">
+                        <span class="w-20 font-semibold text-slate-500 flex items-center gap-1.5"><i class="fa-solid fa-phone text-blue-500 w-3"></i> 연락처:</span>
+                        <span id="modalContact" class="font-medium text-slate-800 flex-1">미기재</span>
+                    </div>
+                </div>
+
+                <div>
+                    <h4 class="text-xs font-semibold text-slate-500 mb-1">상세 특징</h4>
+                    <p id="modalDescription" class="text-xs text-slate-700 bg-white p-3 border border-slate-100 rounded-xl leading-relaxed whitespace-pre-line">
+                        상세 설명 내용이 들어갑니다.
+                    </p>
+                </div>
+
+                <div class="border-t border-slate-100 pt-3 space-y-2">
+                    <h4 class="text-xs font-bold text-slate-800 flex items-center justify-between">
+                        <span><i class="fa-regular fa-comments text-brand-blue mr-1"></i> 제보 / 댓글 (<span id="commentCount">0</span>)</span>
+                    </h4>
+                    
+                    <div id="commentsList" class="space-y-1.5 max-h-36 overflow-y-auto text-xs pr-1 hide-scrollbar"></div>
+
+                    <div class="flex gap-2 pt-1">
+                        <input type="text" id="commentInput" placeholder="제보 또는 댓글을 작성하세요..." class="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-brand-blue">
+                        <button onclick="addComment()" class="bg-brand-blue text-white px-3 py-2 rounded-xl text-xs font-semibold hover:bg-brand-blueDark transition">
+                            작성
+                        </button>
+                    </div>
+                </div>
+
+                <div class="pt-2 flex gap-2">
+                    <button id="toggleStatusBtn" onclick="toggleItemStatusModal()" class="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl text-xs shadow-sm transition flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-check-double"></i> 주인 찾음 완료 처리
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cloud Info Modal -->
+    <div id="cloudModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl animate-modal">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-cloud text-brand-blue"></i> Supabase 클라우드 상태
+                </h3>
+                <button onclick="closeModal('cloudModal')" class="text-slate-400 hover:text-slate-600">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <p id="cloudStatusDesc" class="text-xs text-slate-500 mb-3 leading-relaxed">
+                Supabase 데이터베이스와 실시간으로 동기화되고 있습니다.
+            </p>
+            <div class="bg-emerald-50 text-emerald-800 p-3 rounded-xl text-xs space-y-1 mb-4 border border-emerald-100">
+                <p class="font-semibold"><i class="fa-solid fa-circle-check"></i> 실시간 연동 완료</p>
+                <p class="text-[11px] opacity-90">URL: <span id="cloudUrlDisplay" class="font-mono">https://hutqogujbsrbeixreytg.supabase.co</span></p>
+            </div>
+            <button onclick="closeModal('cloudModal')" class="w-full py-2.5 bg-slate-900 text-white text-xs font-bold rounded-xl">
+                확인
+            </button>
+        </div>
+    </div>
+
+    <!-- Toast Component -->
+    <div id="toast" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 hidden bg-slate-900 text-white px-4 py-2.5 rounded-xl text-xs font-medium shadow-xl transition-all duration-300 flex items-center gap-2">
+        <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400"></i>
+        <span id="toastMsg">메시지 내용</span>
+    </div>
+
+    <script>
+        // SUPABASE CONFIGURATION
+        const SUPABASE_URL = 'https://hutqogujbsrbeixreytg.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh1dHFvZ3VqYnNyYmVpeHJleXRnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0OTM2NTAsImV4cCI6MjEwMjA2OTY1MH0.AWig9H6CkNU4JjKqGPBM415aWzFNKX_1grl23LYu-q4';
+        
+        let supabaseClient = null;
+        if (window.supabase) {
+            supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        }
+
+        // Mock Data Fallback
+        const MOCK_ITEMS = [
+            {
+                id: 'item-1',
+                type: 'found',
+                title: '에어팟 프로 2세대 (파란색 스티치 케이스)',
+                category: '전자기기',
+                location: '본관',
+                date: '2026-08-11',
+                keeper: '본관 2층 교무실 김선생님 보관',
+                description: '본관 2층 계단 옆에서 발견하였습니다. 파란색 키링이 달려있고 본체 뒷면에 작은 긁힘이 있습니다.',
+                contact: '오픈채팅: @학교에어팟주인',
+                imageUrl: 'https://images.unsplash.com/photo-1600294037681-c80b4cb5b434?w=500&auto=format&fit=crop&q=60',
+                resolved: false,
+                createdAt: Date.now() - 3600000 * 2,
+                comments: [{ id: 'c1', text: '케이스 안쪽에 혹시 스티커 붙어있나요?', time: '2시간 전' }]
+            },
+            {
+                id: 'item-2',
+                type: 'lost',
+                title: '검은색 가죽 지갑 (학생증 포함)',
+                category: '지갑/카드',
+                location: '급식실',
+                date: '2026-08-12',
+                keeper: '발견하신 분은 연락 부탁드립니다',
+                description: '점심시간 급식실 퇴식구 근처에서 분실한 것 같습니다. 내부 학생증과 버스카드가 들어있습니다.',
+                contact: '010-1234-5678',
+                imageUrl: 'https://images.unsplash.com/photo-1627123424574-724758594e93?w=500&auto=format&fit=crop&q=60',
+                resolved: false,
+                createdAt: Date.now() - 3600000 * 5,
+                comments: []
+            }
+        ];
+
+        // Global State Variables
+        let items = [];
+        let activeTypeFilter = 'all'; 
+        let activeCategoryFilter = 'all';
+        let currentDetailItemId = null;
+        let selectedImageBase64 = null;
+        let selectedFileObj = null;
+        let myItemIds = new Set();
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initCurrentDate();
+            loadMyItemIds();
+            loadItems();
+            setupRealtimeSubscription();
+        });
+
+        function initCurrentDate() {
+            const today = new Date().toISOString().split('T')[0];
+            const dateInput = document.getElementById('itemDate');
+            if (dateInput) dateInput.value = today;
+        }
+
+        function loadMyItemIds() {
+            const savedMyIds = localStorage.getItem('foundit_my_items');
+            if (savedMyIds) {
+                try {
+                    myItemIds = new Set(JSON.parse(savedMyIds));
+                } catch(e) {}
+            }
+        }
+
+        function saveMyItemIds() {
+            localStorage.setItem('foundit_my_items', JSON.stringify([...myItemIds]));
+        }
+
+        // Fetch Items from Supabase (with Local Fallback)
+        async function loadItems() {
+            if (supabaseClient) {
+                try {
+                    const { data, error } = await supabaseClient
+                        .from('lost_items')
+                        .select('*')
+                        .order('created_at', { ascending: false });
+
+                    if (!error && data) {
+                        items = data.map(item => ({
+                            id: item.id,
+                            type: item.type,
+                            title: item.title,
+                            category: item.category,
+                            location: item.location,
+                            date: item.date,
+                            keeper: item.keeper,
+                            description: item.description,
+                            contact: item.contact,
+                            imageUrl: item.image_url || getCategoryDefaultImg(item.category),
+                            resolved: item.resolved || false,
+                            createdAt: item.created_at ? new Date(item.created_at).getTime() : Date.now(),
+                            comments: item.comments || []
+                        }));
+                        applyFilters();
+                        updateLocationCounts();
+                        return;
+                    } else if (error) {
+                        console.warn('Supabase lost_items table error/not created yet:', error.message);
+                    }
+                } catch(e) {
+                    console.error('Supabase query error:', e);
+                }
+            }
+
+            // Fallback to local storage or mock
+            const saved = localStorage.getItem('foundit_items');
+            if (saved) {
+                try { items = JSON.parse(saved); } catch (e) { items = [...MOCK_ITEMS]; }
+            } else {
+                items = [...MOCK_ITEMS];
+            }
+            applyFilters();
+            updateLocationCounts();
+        }
+
+        // Realtime Listener
+        function setupRealtimeSubscription() {
+            if (!supabaseClient) return;
+            try {
+                supabaseClient
+                    .channel('realtime_lost_items')
+                    .on('postgres_changes', { event: '*', schema: 'public', table: 'lost_items' }, () => {
+                        loadItems();
+                    })
+                    .subscribe();
+            } catch(e) {
+                console.warn('Realtime subscription failed', e);
+            }
+        }
+
+        // Navigation Tabs Handling
+        function switchTab(tabName) {
+            const views = ['feed', 'upload', 'map', 'my'];
+            views.forEach(v => {
+                const el = document.getElementById(`view-${v}`);
+                const btn = document.getElementById(`tabBtn-${v}`);
+                if (el) el.classList.add('hidden');
+                if (btn) {
+                    btn.classList.remove('bg-white', 'text-brand-blue', 'shadow-sm', 'font-semibold');
+                    btn.classList.add('text-slate-600', 'font-medium');
+                }
+            });
+
+            const activeView = document.getElementById(`view-${tabName}`);
+            const activeBtn = document.getElementById(`tabBtn-${tabName}`);
+            if (activeView) {
+                activeView.classList.remove('hidden');
+                void activeView.offsetWidth;
+                activeView.classList.add('animate-view');
+            }
+            if (activeBtn) {
+                activeBtn.classList.add('bg-white', 'text-brand-blue', 'shadow-sm', 'font-semibold');
+                activeBtn.classList.remove('text-slate-600', 'font-medium');
+            }
+
+            if (tabName === 'my') renderMyItems();
+            if (tabName === 'feed') applyFilters();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Image Selection
+        function previewImage(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            selectedFileObj = file;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                selectedImageBase64 = e.target.result;
+                document.getElementById('imagePreview').src = selectedImageBase64;
+                document.getElementById('previewContainer').classList.remove('hidden');
+                document.getElementById('uploadPlaceholder').classList.add('hidden');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function removeImage(event) {
+            if(event) event.stopPropagation();
+            selectedImageBase64 = null;
+            selectedFileObj = null;
+            document.getElementById('imageInput').value = '';
+            document.getElementById('previewContainer').classList.add('hidden');
+            document.getElementById('uploadPlaceholder').classList.remove('hidden');
+        }
+
+        // Form Submission with Supabase Upload
+        async function handleFormSubmit(event) {
+            event.preventDefault();
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> 저장 중...`;
+
+            const type = document.querySelector('input[name="itemType"]:checked').value;
+            const title = document.getElementById('itemTitle').value.trim();
+            const category = document.getElementById('itemCategory').value;
+            const location = document.getElementById('itemLocation').value;
+            const date = document.getElementById('itemDate').value;
+            const keeper = document.getElementById('itemKeeper').value.trim();
+            const description = document.getElementById('itemDescription').value.trim();
+            const contact = document.getElementById('itemContact').value.trim();
+
+            let finalImageUrl = selectedImageBase64 || getCategoryDefaultImg(category);
+
+            // Upload image to Supabase Storage if file selected
+            if (selectedFileObj && supabaseClient) {
+                try {
+                    const fileExt = selectedFileObj.name.split('.').pop();
+                    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+                    
+                    const { data: uploadData, error: uploadErr } = await supabaseClient
+                        .storage
+                        .from('lost-images')
+                        .upload(fileName, selectedFileObj);
+
+                    if (!uploadErr && uploadData) {
+                        const { data: publicUrlData } = supabaseClient
+                            .storage
+                            .from('lost-images')
+                            .getPublicUrl(fileName);
+                        
+                        if (publicUrlData && publicUrlData.publicUrl) {
+                            finalImageUrl = publicUrlData.publicUrl;
+                        }
+                    }
+                } catch (e) {
+                    console.warn('Storage upload warning:', e);
+                }
+            }
+
+            // Insert Record into Supabase
+            if (supabaseClient) {
+                try {
+                    const { data, error } = await supabaseClient
+                        .from('lost_items')
+                        .insert([{
+                            type: type,
+                            title: title,
+                            category: category,
+                            location: location,
+                            date: date,
+                            keeper: keeper,
+                            description: description || '등록된 상세 설명이 없습니다.',
+                            contact: contact || '상세 문의는 댓글을 이용해 주세요.',
+                            image_url: finalImageUrl,
+                            resolved: false,
+                            comments: []
+                        }])
+                        .select();
+
+                    if (!error && data && data.length > 0) {
+                        myItemIds.add(data[0].id);
+                        saveMyItemIds();
+                        showToast('Supabase에 성공적으로 저장되었습니다!');
+                        finishSubmission();
+                        return;
+                    }
+                } catch (e) {
+                    console.error('Supabase DB Insert Error:', e);
+                }
+            }
+
+            // Local Fallback if DB insert fails
+            const newItem = {
+                id: 'item-' + Date.now(),
+                type, title, category, location, date, keeper,
+                description: description || '등록된 상세 설명이 없습니다.',
+                contact: contact || '상세 문의는 댓글을 이용해 주세요.',
+                imageUrl: finalImageUrl,
+                resolved: false,
+                createdAt: Date.now(),
+                comments: []
+            };
+            items.unshift(newItem);
+            myItemIds.add(newItem.id);
+            saveMyItemIds();
+            localStorage.setItem('foundit_items', JSON.stringify(items));
+            showToast('로컬에 저장되었습니다. (테이블 생성 후 서버에 보관됩니다)');
+
+            finishSubmission();
+
+            function finishSubmission() {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = `<i class="fa-solid fa-check"></i> 등록하기`;
+                document.getElementById('uploadForm').reset();
+                removeImage();
+                initCurrentDate();
+                loadItems();
+                switchTab('feed');
+            }
+        }
+
+        function getCategoryDefaultImg(category) {
+            switch(category) {
+                case '전자기기': return 'https://images.unsplash.com/photo-1546868871-7041f2a55e12?w=500&auto=format&fit=crop&q=60';
+                case '지갑/카드': return 'https://images.unsplash.com/photo-1627123424574-724758594e93?w=500&auto=format&fit=crop&q=60';
+                case '의류/가방': return 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=500&auto=format&fit=crop&q=60';
+                case '도서/문구': return 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=500&auto=format&fit=crop&q=60';
+                default: return 'https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?w=500&auto=format&fit=crop&q=60';
+            }
+        }
+
+        // Filtering Logic
+        function setTypeFilter(type) {
+            activeTypeFilter = type;
+            document.querySelectorAll('.type-filter-btn').forEach(btn => {
+                btn.classList.remove('bg-white', 'text-slate-800', 'shadow-sm', 'font-semibold');
+                btn.classList.add('text-slate-600');
+            });
+            const activeBtn = document.getElementById(`filter-type-${type}`);
+            if (activeBtn) {
+                activeBtn.classList.add('bg-white', 'text-slate-800', 'shadow-sm', 'font-semibold');
+                activeBtn.classList.remove('text-slate-600');
+            }
+            applyFilters();
+        }
+
+        function setCategoryFilter(category) {
+            activeCategoryFilter = category;
+            document.querySelectorAll('.cat-pill').forEach(btn => {
+                if (btn.dataset.cat === category) {
+                    btn.classList.add('bg-slate-900', 'text-white');
+                    btn.classList.remove('bg-slate-100', 'text-slate-600');
+                } else {
+                    btn.classList.remove('bg-slate-900', 'text-white');
+                    btn.classList.add('bg-slate-100', 'text-slate-600');
+                }
+            });
+            applyFilters();
+        }
+
+        function filterByLocation(location) {
+            switchTab('feed');
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput) searchInput.value = location;
+            applyFilters();
+        }
+
+        function clearSearch() {
+            document.getElementById('searchInput').value = '';
+            applyFilters();
+        }
+
+        function applyFilters() {
+            const query = document.getElementById('searchInput').value.toLowerCase().trim();
+            const hideResolved = document.getElementById('hideResolvedCheck').checked;
+            const clearBtn = document.getElementById('clearSearchBtn');
+
+            if (clearBtn) {
+                if (query) clearBtn.classList.remove('hidden');
+                else clearBtn.classList.add('hidden');
+            }
+
+            const filtered = items.filter(item => {
+                if (activeTypeFilter !== 'all' && item.type !== activeTypeFilter) return false;
+                if (activeCategoryFilter !== 'all' && item.category !== activeCategoryFilter) return false;
+                if (hideResolved && item.resolved) return false;
+                
+                if (query) {
+                    const matchTitle = item.title.toLowerCase().includes(query);
+                    const matchLoc = item.location.toLowerCase().includes(query);
+                    const matchDesc = item.description.toLowerCase().includes(query);
+                    const matchKeeper = item.keeper.toLowerCase().includes(query);
+                    if (!matchTitle && !matchLoc && !matchDesc && !matchKeeper) return false;
+                }
+                return true;
+            });
+
+            renderItems(filtered);
+            updateStats();
+        }
+
+        function getCategoryIconClass(category) {
+            switch(category) {
+                case '전자기기': return 'fa-laptop';
+                case '지갑/카드': return 'fa-wallet';
+                case '의류/가방': return 'fa-shirt';
+                case '도서/문구': return 'fa-book';
+                default: return 'fa-box';
+            }
+        }
+
+        function renderItems(itemList) {
+            const grid = document.getElementById('itemsGrid');
+            const emptyState = document.getElementById('emptyState');
+            const countEl = document.getElementById('resultCount');
+
+            if (countEl) countEl.textContent = itemList.length;
+
+            if (itemList.length === 0) {
+                grid.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            grid.innerHTML = itemList.map(item => `
+                <div onclick="openDetailModal('${item.id}')" class="bg-white rounded-2xl overflow-hidden border border-slate-200/80 shadow-xs hover:shadow-md transition cursor-pointer flex flex-col relative group">
+                    <div class="relative h-40 bg-slate-100 overflow-hidden">
+                        <img src="${item.imageUrl}" alt="${escapeHtml(item.title)}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
+                        
+                        <div class="absolute top-2.5 left-2.5 flex gap-1.5 flex-wrap">
+                            ${item.type === 'found' 
+                                ? `<span class="bg-emerald-500/90 backdrop-blur-md text-white text-[11px] font-bold px-2 py-0.5 rounded-lg shadow-xs flex items-center gap-1"><i class="fa-solid fa-hand-holding-heart text-[10px]"></i> 습득물</span>`
+                                : `<span class="bg-rose-500/90 backdrop-blur-md text-white text-[11px] font-bold px-2 py-0.5 rounded-lg shadow-xs flex items-center gap-1"><i class="fa-solid fa-circle-question text-[10px]"></i> 분실물</span>`
+                            }
+                            ${item.resolved 
+                                ? `<span class="bg-slate-900/80 backdrop-blur-md text-white text-[11px] font-bold px-2 py-0.5 rounded-lg shadow-xs flex items-center gap-1"><i class="fa-solid fa-check text-[10px]"></i> 주인찾음 완료</span>`
+                                : ``
+                            }
+                        </div>
+
+                        <span class="absolute bottom-2.5 right-2.5 bg-slate-900/70 backdrop-blur-md text-white text-[10px] font-medium px-2 py-0.5 rounded-md flex items-center gap-1">
+                            <i class="fa-solid fa-location-dot text-[9px] text-rose-300"></i> ${escapeHtml(item.location)}
+                        </span>
+                    </div>
+
+                    <div class="p-3.5 flex-1 flex flex-col justify-between space-y-2">
+                        <div>
+                            <div class="flex justify-between items-center text-[11px] text-slate-400 mb-1">
+                                <span class="flex items-center gap-1"><i class="fa-solid ${getCategoryIconClass(item.category)} text-[10px]"></i> ${escapeHtml(item.category)}</span>
+                                <span>${item.date}</span>
+                            </div>
+                            <h3 class="font-bold text-xs text-slate-800 line-clamp-1 group-hover:text-brand-blue transition">
+                                ${escapeHtml(item.title)}
+                            </h3>
+                            <p class="text-[11px] text-slate-500 line-clamp-2 mt-1 leading-relaxed">
+                                ${escapeHtml(item.description)}
+                            </p>
+                        </div>
+
+                        <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+                            <span class="text-slate-600 font-medium truncate max-w-[150px] flex items-center gap-1">
+                                <i class="fa-solid fa-box-archive text-slate-400"></i> ${escapeHtml(item.keeper)}
+                            </span>
+                            <span class="flex items-center gap-1">
+                                <i class="fa-regular fa-comment"></i> ${item.comments ? item.comments.length : 0}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function openDetailModal(id) {
+            const item = items.find(i => String(i.id) === String(id));
+            if (!item) return;
+
+            currentDetailItemId = id;
+
+            document.getElementById('modalImg').src = item.imageUrl;
+            document.getElementById('modalTitle').textContent = item.title;
+            document.getElementById('modalCategory').textContent = item.category;
+            document.getElementById('modalDate').textContent = item.date;
+            document.getElementById('modalLocation').textContent = item.location;
+            document.getElementById('modalKeeper').textContent = item.keeper;
+            document.getElementById('modalContact').textContent = item.contact || '미기재';
+            document.getElementById('modalDescription').textContent = item.description;
+
+            const badge = document.getElementById('modalTypeBadge');
+            if (item.type === 'found') {
+                badge.className = 'absolute top-3 left-3 px-2.5 py-1 rounded-lg text-xs font-bold text-white shadow-xs bg-emerald-500 flex items-center gap-1';
+                badge.innerHTML = '<i class="fa-solid fa-hand-holding-heart text-[11px]"></i> 습득물';
+            } else {
+                badge.className = 'absolute top-3 left-3 px-2.5 py-1 rounded-lg text-xs font-bold text-white shadow-xs bg-rose-500 flex items-center gap-1';
+                badge.innerHTML = '<i class="fa-solid fa-circle-question text-[11px]"></i> 분실물';
+            }
+
+            const toggleBtn = document.getElementById('toggleStatusBtn');
+            if (item.resolved) {
+                toggleBtn.className = 'flex-1 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs transition flex items-center justify-center gap-1.5';
+                toggleBtn.innerHTML = '<i class="fa-solid fa-rotate-left"></i> 찾음 완료 취소하기';
+            } else {
+                toggleBtn.className = 'flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl text-xs shadow-sm transition flex items-center justify-center gap-1.5';
+                toggleBtn.innerHTML = '<i class="fa-solid fa-check-double"></i> 주인 찾음 완료 처리';
+            }
+
+            renderComments(item);
+            openModal('detailModal');
+        }
+
+        async function toggleItemStatusModal() {
+            if (!currentDetailItemId) return;
+            const item = items.find(i => String(i.id) === String(currentDetailItemId));
+            if (item) {
+                const newStatus = !item.resolved;
+                item.resolved = newStatus;
+
+                if (supabaseClient) {
+                    await supabaseClient
+                        .from('lost_items')
+                        .update({ resolved: newStatus })
+                        .eq('id', currentDetailItemId);
+                }
+
+                openDetailModal(currentDetailItemId);
+                applyFilters();
+                showToast(newStatus ? '주인 찾음 완료로 변경되었습니다.' : '찾음 상태가 취소되었습니다.');
+            }
+        }
+
+        function renderComments(item) {
+            const list = document.getElementById('commentsList');
+            const countEl = document.getElementById('commentCount');
+            const comments = item.comments || [];
+
+            countEl.textContent = comments.length;
+
+            if (comments.length === 0) {
+                list.innerHTML = `<p class="text-slate-400 text-[11px] py-2 text-center">작성된 제보나 댓글이 없습니다.</p>`;
+                return;
+            }
+
+            list.innerHTML = comments.map(c => `
+                <div class="bg-slate-50 p-2 rounded-lg flex justify-between items-start border border-slate-100">
+                    <span class="text-slate-700 font-medium">${escapeHtml(c.text)}</span>
+                    <span class="text-[10px] text-slate-400 whitespace-nowrap ml-2">${c.time}</span>
+                </div>
+            `).join('');
+        }
+
+        async function addComment() {
+            const input = document.getElementById('commentInput');
+            const text = input.value.trim();
+            if (!text || !currentDetailItemId) return;
+
+            const item = items.find(i => String(i.id) === String(currentDetailItemId));
+            if (item) {
+                if (!item.comments) item.comments = [];
+                const newComment = { id: 'c-' + Date.now(), text: text, time: '방금 전' };
+                item.comments.push(newComment);
+
+                if (supabaseClient) {
+                    await supabaseClient
+                        .from('lost_items')
+                        .update({ comments: item.comments })
+                        .eq('id', currentDetailItemId);
+                }
+
+                renderComments(item);
+                input.value = '';
+                showToast('댓글 제보가 추가되었습니다.');
+            }
+        }
+
+        function renderMyItems() {
+            const grid = document.getElementById('myItemsGrid');
+            const myItems = items.filter(i => myItemIds.has(String(i.id)));
+
+            if (myItems.length === 0) {
+                grid.innerHTML = `<div class="text-center py-8 text-slate-400 text-xs">내가 등록한 분실/습득물이 없습니다.</div>`;
+                return;
+            }
+
+            grid.innerHTML = myItems.map(item => `
+                <div class="bg-slate-50 border border-slate-200/80 rounded-xl p-3 flex items-center justify-between gap-3 hover:bg-slate-100/50 transition">
+                    <div class="flex items-center gap-3 min-w-0 flex-1">
+                        <img src="${item.imageUrl}" class="w-12 h-12 rounded-lg object-cover bg-slate-200">
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-center gap-1.5 mb-0.5">
+                                <span class="text-[10px] px-1.5 py-0.2 rounded font-bold ${item.type === 'found' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">
+                                    ${item.type === 'found' ? '습득' : '분실'}
+                                </span>
+                                <span class="text-[11px] text-slate-400">${item.date}</span>
+                            </div>
+                            <h4 class="text-xs font-bold text-slate-800 truncate">${escapeHtml(item.title)}</h4>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <button onclick="openDetailModal('${item.id}')" class="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50">
+                            보기
+                        </button>
+                        <button onclick="deleteMyItem('${item.id}')" class="p-1.5 text-slate-400 hover:text-rose-500 rounded-lg transition" title="삭제">
+                            <i class="fa-solid fa-trash-can text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function deleteMyItem(id) {
+            if (supabaseClient) {
+                await supabaseClient.from('lost_items').delete().eq('id', id);
+            }
+            items = items.filter(i => String(i.id) !== String(id));
+            myItemIds.delete(String(id));
+            saveMyItemIds();
+            renderMyItems();
+            applyFilters();
+            showToast('등록 항목이 삭제되었습니다.');
+        }
+
+        function updateStats() {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const todayCount = items.filter(i => i.date === todayStr || (i.createdAt && (Date.now() - i.createdAt < 86400000))).length;
+            const todayEl = document.getElementById('todayCount');
+            if (todayEl) todayEl.textContent = todayCount;
+        }
+
+        function updateLocationCounts() {
+            const locs = ['본관', '신관', '도서관', '체육관', '급식실', '운동장'];
+            locs.forEach(loc => {
+                const count = items.filter(i => i.location === loc && !i.resolved).length;
+                const el = document.getElementById(`count-loc-${loc}`);
+                if (el) el.textContent = count;
+            });
+        }
+
+        function openModal(id) {
+            const m = document.getElementById(id);
+            if (m) m.classList.remove('hidden');
+        }
+
+        function closeModal(id) {
+            const m = document.getElementById(id);
+            if (m) m.classList.add('hidden');
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMsg');
+            if (toast && toastMsg) {
+                toastMsg.textContent = msg;
+                toast.classList.remove('hidden');
+                setTimeout(() => { toast.classList.add('hidden'); }, 2500);
+            }
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text.replace(/&/g, "&amp;")
+                       .replace(/</g, "&lt;")
+                       .replace(/>/g, "&gt;")
+                       .replace(/"/g, "&quot;")
+                       .replace(/'/g, "&#039;");
+        }
+    </script>
+</body>
+</html>            animation: modalPop 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .pulse-badge {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .4; }
+        }
+    </style>
+</head>
+<body class="bg-brand-bg text-brand-text min-h-screen flex flex-col justify-between selection:bg-blue-100 selection:text-blue-600">
+
+    <!-- Top Header Navigation -->
+    <header class="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200/80 shadow-sm">
+        <div class="max-w-md md:max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center space-x-2.5 cursor-pointer" onclick="switchTab('feed')">
+                <div class="bg-brand-blue text-white w-9 h-9 rounded-xl flex items-center justify-center text-lg font-bold shadow-sm shadow-blue-200">
+                    <i class="fa-solid fa-magnifying-glass-location"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-base leading-tight text-slate-900 flex items-center gap-2">
+                        찾았닷!
+                        <span class="text-[10px] bg-slate-100 text-slate-600 font-semibold px-2 py-0.5 rounded-full border border-slate-200">교내 분실물 센터</span>
+                    </h1>
+                </div>
+            </div>
+
+            <!-- Header Action Buttons & Stats -->
+            <div class="flex items-center gap-2">
+                <div class="hidden sm:flex items-center gap-1.5 bg-slate-100/80 px-2.5 py-1 rounded-lg text-xs text-slate-600">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 pulse-badge"></span>
+                    <span>오늘 등록 <strong id="todayCount" class="text-brand-blue">0</strong>건</span>
+                </div>
+
+                <!-- Main CTA Button Relocated Here -->
+                <button onclick="switchTab('upload')" class="bg-brand-coral hover:bg-brand-coralHover active:scale-95 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-sm transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-plus text-xs"></i>
+                    <span>물건 등록</span>
+                </button>
+
+                <button onclick="openModal('cloudModal')" class="p-2 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition" title="동기화 정보">
+                    <i class="fa-solid fa-cloud text-sm"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT CONTAINER -->
+    <main class="max-w-md md:max-w-4xl mx-auto px-4 pt-4 pb-24 w-full flex-grow">
+
+        <!-- Navigation Tabs (Segmented Control Style) -->
+        <div class="bg-slate-200/60 p-1 rounded-2xl mb-4 flex border border-slate-200 shadow-inner">
+            <button id="tabBtn-feed" onclick="switchTab('feed')" class="flex-1 py-2 text-xs font-semibold rounded-xl text-brand-blue bg-white shadow-sm transition-all duration-200 flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-layer-group"></i> 분실물 피드
+            </button>
+            <button id="tabBtn-map" onclick="switchTab('map')" class="flex-1 py-2 text-xs font-medium rounded-xl text-slate-600 hover:text-slate-900 transition-all duration-200 flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-map-pin"></i> 장소별 지도
+            </button>
+            <button id="tabBtn-my" onclick="switchTab('my')" class="flex-1 py-2 text-xs font-medium rounded-xl text-slate-600 hover:text-slate-900 transition-all duration-200 flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-clock-rotate-left"></i> 내 등록 내역
+            </button>
+        </div>
+
+        <!-- ================= VIEW 1: FEED PAGE ================= -->
+        <section id="view-feed" class="animate-view space-y-3.5">
+            <!-- Filter & Search Toolbar -->
+            <div class="bg-white rounded-2xl p-3.5 shadow-sm border border-slate-200/70 space-y-3">
+                <!-- Search Box -->
+                <div class="relative">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                    <input type="text" id="searchInput" oninput="applyFilters()" placeholder="물건명, 특이사항, 장소 검색..." class="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-brand-blue focus:bg-white transition">
+                    <button id="clearSearchBtn" onclick="clearSearch()" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                        <i class="fa-solid fa-circle-xmark text-xs"></i>
+                    </button>
+                </div>
+
+                <!-- Type Filters (전체 / 습득물 / 분실물) -->
+                <div class="grid grid-cols-3 gap-1.5 text-xs font-medium bg-slate-100 p-1 rounded-xl">
+                    <button onclick="setTypeFilter('all')" id="filter-type-all" class="type-filter-btn py-1.5 rounded-lg bg-white text-slate-800 shadow-sm text-center font-semibold transition">
+                        전체 보기
+                    </button>
+                    <button onclick="setTypeFilter('found')" id="filter-type-found" class="type-filter-btn py-1.5 rounded-lg text-slate-600 hover:text-slate-900 text-center transition">
+                        <i class="fa-solid fa-hand-holding-heart text-emerald-500 mr-1"></i>습득물
+                    </button>
+                    <button onclick="setTypeFilter('lost')" id="filter-type-lost" class="type-filter-btn py-1.5 rounded-lg text-slate-600 hover:text-slate-900 text-center transition">
+                        <i class="fa-solid fa-circle-question text-rose-500 mr-1"></i>분실물
+                    </button>
+                </div>
+
+                <!-- Category Horizontal Scroll Pills (Vector Icons) -->
+                <div class="flex items-center space-x-1.5 overflow-x-auto hide-scrollbar pt-0.5 text-xs">
+                    <button onclick="setCategoryFilter('all')" class="cat-pill active-cat-pill px-3 py-1.5 rounded-xl bg-slate-900 text-white font-medium whitespace-nowrap transition flex items-center gap-1.5" data-cat="all">
+                        <i class="fa-solid fa-border-all text-[11px]"></i> 전체
+                    </button>
+                    <button onclick="setCategoryFilter('전자기기')" class="cat-pill px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 font-medium whitespace-nowrap hover:bg-slate-200 transition flex items-center gap-1.5" data-cat="전자기기">
+                        <i class="fa-solid fa-laptop text-[11px]"></i> 전자기기
+                    </button>
+                    <button onclick="setCategoryFilter('지갑/카드')" class="cat-pill px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 font-medium whitespace-nowrap hover:bg-slate-200 transition flex items-center gap-1.5" data-cat="지갑/카드">
+                        <i class="fa-solid fa-wallet text-[11px]"></i> 지갑/카드
+                    </button>
+                    <button onclick="setCategoryFilter('의류/가방')" class="cat-pill px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 font-medium whitespace-nowrap hover:bg-slate-200 transition flex items-center gap-1.5" data-cat="의류/가방">
+                        <i class="fa-solid fa-shirt text-[11px]"></i> 의류/가방
+                    </button>
+                    <button onclick="setCategoryFilter('도서/문구')" class="cat-pill px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 font-medium whitespace-nowrap hover:bg-slate-200 transition flex items-center gap-1.5" data-cat="도서/문구">
+                        <i class="fa-solid fa-book text-[11px]"></i> 도서/문구
+                    </button>
+                    <button onclick="setCategoryFilter('기타')" class="cat-pill px-3 py-1.5 rounded-xl bg-slate-100 text-slate-600 font-medium whitespace-nowrap hover:bg-slate-200 transition flex items-center gap-1.5" data-cat="기타">
+                        <i class="fa-solid fa-box text-[11px]"></i> 기타
+                    </button>
+                </div>
+            </div>
+
+            <!-- List Count & Active Filters Header -->
+            <div class="flex justify-between items-center text-xs text-slate-500 px-1 pt-1">
+                <span>조회된 물건 <strong id="resultCount" class="text-slate-900 font-bold">0</strong>개</span>
+                <label class="flex items-center gap-1.5 cursor-pointer select-none">
+                    <input type="checkbox" id="hideResolvedCheck" onchange="applyFilters()" class="rounded border-slate-300 text-brand-blue focus:ring-brand-blue w-3.5 h-3.5">
+                    <span>주인 찾음 완료 항목 제외</span>
+                </label>
+            </div>
+
+            <!-- Items Cards Grid Container -->
+            <div id="itemsGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <!-- Items dynamically injected -->
+            </div>
+
+            <!-- Empty State -->
+            <div id="emptyState" class="hidden text-center py-12 bg-white rounded-2xl border border-dashed border-slate-200 p-6">
+                <div class="w-12 h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-3 text-lg">
+                    <i class="fa-solid fa-box-open"></i>
+                </div>
+                <h3 class="font-bold text-slate-700 text-sm mb-1">등록된 물건이 없습니다</h3>
+                <p class="text-xs text-slate-400 mb-4">조건을 변경하거나 새로운 분실/습득물을 등록해 보세요.</p>
+                <button onclick="switchTab('upload')" class="bg-brand-blue text-white text-xs font-semibold px-4 py-2 rounded-xl shadow-sm hover:bg-brand-blueDark transition">
+                    물건 등록하기
+                </button>
+            </div>
+        </section>
+
+        <!-- ================= VIEW 2: UPLOAD FORM PAGE ================= -->
+        <section id="view-upload" class="hidden animate-view">
+            <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/80">
+                <div class="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
+                    <h2 class="font-bold text-slate-900 text-base flex items-center gap-2">
+                        <i class="fa-solid fa-file-circle-plus text-brand-coral"></i> 분실 / 습득물 등록
+                    </h2>
+                    <span class="text-[11px] text-slate-400">* 표시 항목 필수</span>
+                </div>
+
+                <form id="uploadForm" onsubmit="handleFormSubmit(event)" class="space-y-4">
+
+                    <!-- Type Selection (습득함 / 잃어버림) -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">등록 구분 *</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <label class="cursor-pointer">
+                                <input type="radio" name="itemType" value="found" checked class="peer sr-only">
+                                <div class="p-3 text-center rounded-xl border border-slate-200 peer-checked:border-emerald-500 peer-checked:bg-emerald-50/60 peer-checked:text-emerald-700 font-semibold text-xs transition flex items-center justify-center gap-2">
+                                    <i class="fa-solid fa-hand-holding-heart text-emerald-500 text-sm"></i> 습득함 (주웠어요)
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="itemType" value="lost" class="peer sr-only">
+                                <div class="p-3 text-center rounded-xl border border-slate-200 peer-checked:border-rose-500 peer-checked:bg-rose-50/60 peer-checked:text-rose-700 font-semibold text-xs transition flex items-center justify-center gap-2">
+                                    <i class="fa-solid fa-circle-question text-rose-500 text-sm"></i> 분실함 (찾아요)
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Photo Upload Container -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">사진 첨부 (선택)</label>
+                        <div class="relative border-2 border-dashed border-slate-200 hover:border-slate-300 rounded-xl p-4 text-center hover:bg-slate-50/50 transition cursor-pointer" onclick="document.getElementById('imageInput').click()">
+                            <input type="file" id="imageInput" accept="image/*" onchange="previewImage(event)" class="hidden">
+                            
+                            <div id="uploadPlaceholder" class="space-y-1">
+                                <div class="w-10 h-10 bg-blue-50 text-brand-blue rounded-full flex items-center justify-center mx-auto mb-1">
+                                    <i class="fa-solid fa-camera text-base"></i>
+                                </div>
+                                <p class="text-xs font-medium text-slate-700">사진 클릭하여 업로드</p>
+                                <p class="text-[11px] text-slate-400">JPG, PNG 파일 지원</p>
+                            </div>
+
+                            <div id="previewContainer" class="hidden relative">
+                                <img id="imagePreview" src="" alt="미리보기" class="max-h-48 rounded-lg mx-auto object-cover shadow-sm">
+                                <button type="button" onclick="removeImage(event)" class="absolute top-1 right-1 bg-slate-900/80 text-white w-7 h-7 rounded-full flex items-center justify-center text-xs hover:bg-rose-600 transition">
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Item Title -->
+                    <div>
+                        <label for="itemTitle" class="block text-xs font-semibold text-slate-700 mb-1">물건 제목 *</label>
+                        <input type="text" id="itemTitle" required placeholder="예: 검은색 에어팟 프로 2세대, 파란색 카드지갑" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-brand-blue focus:bg-white transition">
+                    </div>
+
+                    <!-- Category & Location Grid -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label for="itemCategory" class="block text-xs font-semibold text-slate-700 mb-1">카테고리 *</label>
+                            <select id="itemCategory" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-brand-blue focus:bg-white transition">
+                                <option value="전자기기">전자기기</option>
+                                <option value="지갑/카드">지갑/카드</option>
+                                <option value="의류/가방">의류/가방</option>
+                                <option value="도서/문구">도서/문구</option>
+                                <option value="기타" selected>기타</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="itemLocation" class="block text-xs font-semibold text-slate-700 mb-1">발견 / 분실 장소 *</label>
+                            <select id="itemLocation" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-brand-blue focus:bg-white transition">
+                                <option value="본관">본관 (교무실/교실)</option>
+                                <option value="신관">신관 (실습실/과학실)</option>
+                                <option value="도서관">도서관 (열람실)</option>
+                                <option value="체육관">체육관 (강당)</option>
+                                <option value="급식실">급식실/매점</option>
+                                <option value="운동장">운동장/스탠드</option>
+                                <option value="기타">기타 장소</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Date & Keeper Info Grid -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label for="itemDate" class="block text-xs font-semibold text-slate-700 mb-1">일시 *</label>
+                            <input type="date" id="itemDate" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-brand-blue focus:bg-white transition">
+                        </div>
+                        <div>
+                            <label for="itemKeeper" class="block text-xs font-semibold text-slate-700 mb-1">현재 보관 위치 / 대처 *</label>
+                            <input type="text" id="itemKeeper" required placeholder="예: 2학년 교무실 보관 중, 학생회 전달" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-brand-blue focus:bg-white transition">
+                        </div>
+                    </div>
+
+                    <!-- Detailed Description -->
+                    <div>
+                        <label for="itemDescription" class="block text-xs font-semibold text-slate-700 mb-1">상세 정보 및 특징</label>
+                        <textarea id="itemDescription" rows="3" placeholder="키링 종류, 내부 상태, 스크래치 등 주인 확인용 특징을 적어주세요." class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-brand-blue focus:bg-white transition"></textarea>
+                    </div>
+
+                    <!-- Contact Details -->
+                    <div>
+                        <label for="itemContact" class="block text-xs font-semibold text-slate-700 mb-1">연락처 / 연락 방법 (선택)</label>
+                        <input type="text" id="itemContact" placeholder="예: 오픈채팅 링크, 전화번호 또는 교무실 방문" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-brand-blue focus:bg-white transition">
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="flex gap-2 pt-2">
+                        <button type="button" onclick="switchTab('feed')" class="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold rounded-xl text-xs transition">
+                            취소
+                        </button>
+                        <button type="submit" class="flex-1 py-3 bg-brand-coral hover:bg-brand-coralHover text-white font-bold rounded-xl text-xs shadow-sm transition flex items-center justify-center gap-1.5">
+                            <i class="fa-solid fa-check"></i> 등록하기
+                        </button>
+                    </div>
+
+                </form>
+            </div>
+        </section>
+
+        <!-- ================= VIEW 3: SCHOOL LOCATION MAP ================= -->
+        <section id="view-map" class="hidden animate-view space-y-3.5">
+            <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80">
+                <div class="mb-3">
+                    <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+                        <i class="fa-solid fa-map-location-dot text-brand-blue"></i> 교내 주요 구역별 현황
+                    </h3>
+                    <p class="text-xs text-slate-400 mt-0.5">장소 카드를 클릭하면 해당 위치의 분실/습득물을 빠르게 필터링합니다.</p>
+                </div>
+
+                <!-- Location Cards Grid (Vector Icon Based) -->
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+
+                    <button onclick="filterByLocation('본관')" class="p-3 rounded-2xl border border-slate-200 hover:border-brand-blue hover:bg-blue-50/50 text-left transition group">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="w-8 h-8 rounded-xl bg-blue-100 text-brand-blue flex items-center justify-center text-sm group-hover:scale-105 transition">
+                                <i class="fa-solid fa-school"></i>
+                            </div>
+                            <span class="text-xs bg-slate-100 group-hover:bg-blue-100 text-slate-600 group-hover:text-brand-blue font-bold px-2 py-0.5 rounded-full" id="count-loc-본관">0</span>
+                        </div>
+                        <div class="font-bold text-xs text-slate-800 group-hover:text-brand-blue">본관</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5">교무실, 일반 교실</div>
+                    </button>
+
+                    <button onclick="filterByLocation('신관')" class="p-3 rounded-2xl border border-slate-200 hover:border-brand-blue hover:bg-blue-50/50 text-left transition group">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-600 flex items-center justify-center text-sm group-hover:scale-105 transition">
+                                <i class="fa-solid fa-building-columns"></i>
+                            </div>
+                            <span class="text-xs bg-slate-100 group-hover:bg-blue-100 text-slate-600 group-hover:text-brand-blue font-bold px-2 py-0.5 rounded-full" id="count-loc-신관">0</span>
+                        </div>
+                        <div class="font-bold text-xs text-slate-800 group-hover:text-brand-blue">신관</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5">과학실, 실습실</div>
+                    </button>
+
+                    <button onclick="filterByLocation('도서관')" class="p-3 rounded-2xl border border-slate-200 hover:border-brand-blue hover:bg-blue-50/50 text-left transition group">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="w-8 h-8 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center text-sm group-hover:scale-105 transition">
+                                <i class="fa-solid fa-book-open"></i>
+                            </div>
+                            <span class="text-xs bg-slate-100 group-hover:bg-blue-100 text-slate-600 group-hover:text-brand-blue font-bold px-2 py-0.5 rounded-full" id="count-loc-도서관">0</span>
+                        </div>
+                        <div class="font-bold text-xs text-slate-800 group-hover:text-brand-blue">도서관</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5">열람실, 자습실</div>
+                    </button>
+
+                    <button onclick="filterByLocation('체육관')" class="p-3 rounded-2xl border border-slate-200 hover:border-brand-blue hover:bg-blue-50/50 text-left transition group">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="w-8 h-8 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center text-sm group-hover:scale-105 transition">
+                                <i class="fa-solid fa-basketball"></i>
+                            </div>
+                            <span class="text-xs bg-slate-100 group-hover:bg-blue-100 text-slate-600 group-hover:text-brand-blue font-bold px-2 py-0.5 rounded-full" id="count-loc-체육관">0</span>
+                        </div>
+                        <div class="font-bold text-xs text-slate-800 group-hover:text-brand-blue">체육관</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5">강당, 탈의실</div>
+                    </button>
+
+                    <button onclick="filterByLocation('급식실')" class="p-3 rounded-2xl border border-slate-200 hover:border-brand-blue hover:bg-blue-50/50 text-left transition group">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-sm group-hover:scale-105 transition">
+                                <i class="fa-solid fa-utensils"></i>
+                            </div>
+                            <span class="text-xs bg-slate-100 group-hover:bg-blue-100 text-slate-600 group-hover:text-brand-blue font-bold px-2 py-0.5 rounded-full" id="count-loc-급식실">0</span>
+                        </div>
+                        <div class="font-bold text-xs text-slate-800 group-hover:text-brand-blue">급식실/매점</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5">식당 주변, 매점 앞</div>
+                    </button>
+
+                    <button onclick="filterByLocation('운동장')" class="p-3 rounded-2xl border border-slate-200 hover:border-brand-blue hover:bg-blue-50/50 text-left transition group">
+                        <div class="flex items-center justify-between mb-2">
+                            <div class="w-8 h-8 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center text-sm group-hover:scale-105 transition">
+                                <i class="fa-solid fa-futbol"></i>
+                            </div>
+                            <span class="text-xs bg-slate-100 group-hover:bg-blue-100 text-slate-600 group-hover:text-brand-blue font-bold px-2 py-0.5 rounded-full" id="count-loc-운동장">0</span>
+                        </div>
+                        <div class="font-bold text-xs text-slate-800 group-hover:text-brand-blue">운동장</div>
+                        <div class="text-[10px] text-slate-400 mt-0.5">스탠드, 축구장</div>
+                    </button>
+
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= VIEW 4: MY ITEMS PAGE ================= -->
+        <section id="view-my" class="hidden animate-view space-y-3.5">
+            <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80">
+                <div class="mb-3">
+                    <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+                        <i class="fa-solid fa-clock-rotate-left text-brand-blue"></i> 내가 등록한 내역
+                    </h3>
+                    <p class="text-xs text-slate-400 mt-0.5">주인을 찾았거나 인계가 완료되었다면 '완료 처리'로 변경해 주세요.</p>
+                </div>
+
+                <div id="myItemsGrid" class="space-y-2">
+                    <!-- My registered items dynamically injected -->
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- FLOATING ACTION BUTTON (Mobile / Quick Register) -->
+    <button onclick="switchTab('upload')" class="fixed bottom-6 right-6 z-30 bg-brand-coral hover:bg-brand-coralHover active:scale-90 text-white w-12 h-12 rounded-full shadow-lg flex items-center justify-center transition-all duration-200" title="물건 등록">
+        <i class="fa-solid fa-plus text-lg"></i>
+    </button>
+
+    <!-- ITEM DETAIL MODAL -->
+    <div id="detailModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl animate-modal overflow-hidden">
+            <!-- Modal Image / Header -->
+            <div class="relative bg-slate-100 min-h-[180px] flex items-center justify-center">
+                <img id="modalImg" src="" alt="상세 사진" class="w-full max-h-64 object-contain">
+                <button onclick="closeModal('detailModal')" class="absolute top-3 right-3 bg-slate-900/70 text-white w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-900 transition">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+                <span id="modalTypeBadge" class="absolute top-3 left-3 px-2.5 py-1 rounded-lg text-xs font-bold text-white shadow-sm">
+                    습득물
+                </span>
+            </div>
+
+            <!-- Modal Body Content -->
+            <div class="p-5 space-y-4">
+                <div>
+                    <div class="flex items-center gap-2 text-xs text-slate-400 mb-1">
+                        <span id="modalCategory" class="bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-medium">카테고리</span>
+                        <span>•</span>
+                        <span id="modalDate">2026-08-12</span>
+                    </div>
+                    <h2 id="modalTitle" class="text-base font-bold text-slate-900">물건 제목</h2>
+                </div>
+
+                <!-- Info Grid -->
+                <div class="bg-slate-50 rounded-xl p-3 space-y-2 text-xs border border-slate-100">
+                    <div class="flex items-start">
+                        <span class="w-20 font-semibold text-slate-500 flex items-center gap-1.5"><i class="fa-solid fa-location-dot text-rose-500 w-3"></i> 장소:</span>
+                        <span id="modalLocation" class="font-medium text-slate-800 flex-1">본관</span>
+                    </div>
+                    <div class="flex items-start">
+                        <span class="w-20 font-semibold text-slate-500 flex items-center gap-1.5"><i class="fa-solid fa-box-archive text-amber-500 w-3"></i> 보관:</span>
+                        <span id="modalKeeper" class="font-medium text-slate-800 flex-1">교무실</span>
+                    </div>
+                    <div class="flex items-start">
+                        <span class="w-20 font-semibold text-slate-500 flex items-center gap-1.5"><i class="fa-solid fa-phone text-blue-500 w-3"></i> 연락처:</span>
+                        <span id="modalContact" class="font-medium text-slate-800 flex-1">미기재</span>
+                    </div>
+                </div>
+
+                <!-- Detailed Description -->
+                <div>
+                    <h4 class="text-xs font-semibold text-slate-500 mb-1">상세 특징</h4>
+                    <p id="modalDescription" class="text-xs text-slate-700 bg-white p-3 border border-slate-100 rounded-xl leading-relaxed whitespace-pre-line">
+                        상세 설명 내용이 들어갑니다.
+                    </p>
+                </div>
+
+                <!-- Comments & Claims Section -->
+                <div class="border-t border-slate-100 pt-3 space-y-2">
+                    <h4 class="text-xs font-bold text-slate-800 flex items-center justify-between">
+                        <span><i class="fa-regular fa-comments text-brand-blue mr-1"></i> 제보 / 댓글 (<span id="commentCount">0</span>)</span>
+                    </h4>
+                    
+                    <div id="commentsList" class="space-y-1.5 max-h-36 overflow-y-auto text-xs pr-1 hide-scrollbar">
+                        <!-- Comments rendered here -->
+                    </div>
+
+                    <!-- Comment Input -->
+                    <div class="flex gap-2 pt-1">
+                        <input type="text" id="commentInput" placeholder="제보 또는 댓글을 작성하세요..." class="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-brand-blue">
+                        <button onclick="addComment()" class="bg-brand-blue text-white px-3 py-2 rounded-xl text-xs font-semibold hover:bg-brand-blueDark transition">
+                            작성
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Status Switch Button -->
+                <div class="pt-2 flex gap-2">
+                    <button id="toggleStatusBtn" onclick="toggleItemStatusModal()" class="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl text-xs shadow-sm transition flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-check-double"></i> 주인 찾음 완료 처리
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CLOUD CONFIG MODAL -->
+    <div id="cloudModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-2xl animate-modal">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-cloud text-brand-blue"></i> 시스템 안내
+                </h3>
+                <button onclick="closeModal('cloudModal')" class="text-slate-400 hover:text-slate-600">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <p class="text-xs text-slate-500 mb-3 leading-relaxed">
+                현재 클라이언트 전용 동기화 모드로 작동 중입니다. 등록, 수정, 삭제, 댓글 제보 기능이 로컬 단말기에 즉시 반응합니다.
+            </p>
+            <div class="bg-blue-50 text-blue-800 p-3 rounded-xl text-xs space-y-1 mb-4 border border-blue-100">
+                <p class="font-semibold"><i class="fa-solid fa-circle-info"></i> 안심 안내</p>
+                <p>실시간 데이터는 브라우저 단말 내에 안전하게 보존됩니다.</p>
+            </div>
+            <button onclick="closeModal('cloudModal')" class="w-full py-2.5 bg-slate-900 text-white text-xs font-bold rounded-xl">
+                확인
+            </button>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION CONTAINER -->
+    <div id="toast" class="fixed top-5 left-1/2 -translate-x-1/2 z-50 hidden bg-slate-900 text-white px-4 py-2.5 rounded-xl text-xs font-medium shadow-xl transition-all duration-300 flex items-center gap-2">
+        <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400"></i>
+        <span id="toastMsg">메시지 내용</span>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        // Default Mock Data for School Lost & Found App
+        const MOCK_ITEMS = [
+            {
+                id: 'item-1',
+                type: 'found', // found: 습득물, lost: 분실물
+                title: '에어팟 프로 2세대 (파란색 스티치 케이스)',
+                category: '전자기기',
+                location: '본관',
+                date: '2026-08-11',
+                keeper: '본관 2층 교무실 김선생님 보관',
+                description: '본관 2층 계단 옆에서 발견하였습니다. 파란색 키링이 달려있고 본체 뒷면에 작은 긁힘이 있습니다.',
+                contact: '오픈채팅: @학교에어팟주인',
+                imageUrl: 'https://images.unsplash.com/photo-1600294037681-c80b4cb5b434?w=500&auto=format&fit=crop&q=60',
+                resolved: false,
+                createdAt: Date.now() - 3600000 * 2,
+                comments: [
+                    { id: 'c1', text: '케이스 안쪽에 혹시 스티커 붙어있나요?', time: '2시간 전' }
+                ]
+            },
+            {
+                id: 'item-2',
+                type: 'lost',
+                title: '검은색 가죽 지갑 (학생증 포함)',
+                category: '지갑/카드',
+                location: '급식실',
+                date: '2026-08-12',
+                keeper: '발견하신 분은 연락 부탁드립니다',
+                description: '점심시간 급식실 퇴식구 근처에서 분실한 것 같습니다. 내부 학생증과 버스카드가 들어있습니다.',
+                contact: '010-1234-5678',
+                imageUrl: 'https://images.unsplash.com/photo-1627123424574-724758594e93?w=500&auto=format&fit=crop&q=60',
+                resolved: false,
+                createdAt: Date.now() - 3600000 * 5,
+                comments: []
+            },
+            {
+                id: 'item-3',
+                type: 'found',
+                title: '검은색 패딩 점퍼 (L사이즈)',
+                category: '의류/가방',
+                location: '체육관',
+                date: '2026-08-10',
+                keeper: '체육관 중앙 관람석 두 번째 줄',
+                description: '체육시간 끝난 후 남아있던 옷입니다. 주머니에 민트색 립밤이 들어있습니다.',
+                contact: '학생회실 방문',
+                imageUrl: 'https://images.unsplash.com/photo-1544441893-675973e31985?w=500&auto=format&fit=crop&q=60',
+                resolved: true,
+                createdAt: Date.now() - 3600000 * 24,
+                comments: [
+                    { id: 'c2', text: '주인 찾아서 인계 완료되었습니다.', time: '어제' }
+                ]
+            },
+            {
+                id: 'item-4',
+                type: 'found',
+                title: '개념원리 수학1 문제집',
+                category: '도서/문구',
+                location: '도서관',
+                date: '2026-08-12',
+                keeper: '도서관 대출 데스크',
+                description: '도서관 창가 자리에 놓여 있었습니다. 앞장에 필기가 되어 있습니다.',
+                contact: '도서관 사서선생님',
+                imageUrl: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?w=500&auto=format&fit=crop&q=60',
+                resolved: false,
+                createdAt: Date.now() - 3600000 * 1,
+                comments: []
+            }
+        ];
+
+        // Global State
+        let items = [];
+        let activeTypeFilter = 'all'; 
+        let activeCategoryFilter = 'all';
+        let currentDetailItemId = null;
+        let selectedImageBase64 = null;
+        let myItemIds = new Set();
+
+        // Initialize App
+        window.addEventListener('DOMContentLoaded', () => {
+            loadItems();
+            initCurrentDate();
+            applyFilters();
+            updateLocationCounts();
+        });
+
+        function initCurrentDate() {
+            const today = new Date().toISOString().split('T')[0];
+            const dateInput = document.getElementById('itemDate');
+            if (dateInput) dateInput.value = today;
+        }
+
+        function loadItems() {
+            const saved = localStorage.getItem('foundit_items');
+            if (saved) {
+                try {
+                    items = JSON.parse(saved);
+                } catch (e) {
+                    items = [...MOCK_ITEMS];
+                }
+            } else {
+                items = [...MOCK_ITEMS];
+                saveItems();
+            }
+
+            const savedMyIds = localStorage.getItem('foundit_my_items');
+            if (savedMyIds) {
+                try {
+                    myItemIds = new Set(JSON.parse(savedMyIds));
+                } catch(e) {}
+            }
+        }
+
+        function saveItems() {
+            localStorage.setItem('foundit_items', JSON.stringify(items));
+            localStorage.setItem('foundit_my_items', JSON.stringify([...myItemIds]));
+            updateLocationCounts();
+        }
+
+        function switchTab(tabName) {
+            const views = ['feed', 'upload', 'map', 'my'];
+            views.forEach(v => {
+                const el = document.getElementById(`view-${v}`);
+                const btn = document.getElementById(`tabBtn-${v}`);
+                if (el) {
+                    el.classList.add('hidden');
+                    el.classList.remove('animate-view');
+                }
+                if (btn) {
+                    btn.classList.remove('bg-white', 'text-brand-blue', 'shadow-sm', 'font-semibold');
+                    btn.classList.add('text-slate-600', 'font-medium');
+                }
+            });
+
+            const activeView = document.getElementById(`view-${tabName}`);
+            const activeBtn = document.getElementById(`tabBtn-${tabName}`);
+            if (activeView) {
+                activeView.classList.remove('hidden');
+                // Force animation restart
+                void activeView.offsetWidth;
+                activeView.classList.add('animate-view');
+            }
+            if (activeBtn) {
+                activeBtn.classList.add('bg-white', 'text-brand-blue', 'shadow-sm', 'font-semibold');
+                activeBtn.classList.remove('text-slate-600', 'font-medium');
+            }
+
+            if (tabName === 'my') renderMyItems();
+            if (tabName === 'feed') applyFilters();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Image Selection & Preview
+        function previewImage(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                selectedImageBase64 = e.target.result;
+                document.getElementById('imagePreview').src = selectedImageBase64;
+                document.getElementById('previewContainer').classList.remove('hidden');
+                document.getElementById('uploadPlaceholder').classList.add('hidden');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function removeImage(event) {
+            if(event) event.stopPropagation();
+            selectedImageBase64 = null;
+            document.getElementById('imageInput').value = '';
+            document.getElementById('previewContainer').classList.add('hidden');
+            document.getElementById('uploadPlaceholder').classList.remove('hidden');
+        }
+
+        function handleFormSubmit(event) {
+            event.preventDefault();
+
+            const type = document.querySelector('input[name="itemType"]:checked').value;
+            const title = document.getElementById('itemTitle').value.trim();
+            const category = document.getElementById('itemCategory').value;
+            const location = document.getElementById('itemLocation').value;
+            const date = document.getElementById('itemDate').value;
+            const keeper = document.getElementById('itemKeeper').value.trim();
+            const description = document.getElementById('itemDescription').value.trim();
+            const contact = document.getElementById('itemContact').value.trim();
+
+            const newItem = {
+                id: 'item-' + Date.now(),
+                type: type,
+                title: title,
+                category: category,
+                location: location,
+                date: date,
+                keeper: keeper,
+                description: description || '등록된 상세 설명이 없습니다.',
+                contact: contact || '상세 문의는 댓글을 이용해 주세요.',
+                imageUrl: selectedImageBase64 || getCategoryDefaultImg(category),
+                resolved: false,
+                createdAt: Date.now(),
+                comments: []
+            };
+
+            items.unshift(newItem);
+            myItemIds.add(newItem.id);
+            saveItems();
+
+            // Reset Form
+            document.getElementById('uploadForm').reset();
+            removeImage();
+            initCurrentDate();
+
+            showToast('성공적으로 등록되었습니다!');
+            switchTab('feed');
+        }
+
+        function getCategoryDefaultImg(category) {
+            switch(category) {
+                case '전자기기': return 'https://images.unsplash.com/photo-1546868871-7041f2a55e12?w=500&auto=format&fit=crop&q=60';
+                case '지갑/카드': return 'https://images.unsplash.com/photo-1627123424574-724758594e93?w=500&auto=format&fit=crop&q=60';
+                case '의류/가방': return 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=500&auto=format&fit=crop&q=60';
+                case '도서/문구': return 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=500&auto=format&fit=crop&q=60';
+                default: return 'https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?w=500&auto=format&fit=crop&q=60';
+            }
+        }
+
+        function setTypeFilter(type) {
+            activeTypeFilter = type;
+            document.querySelectorAll('.type-filter-btn').forEach(btn => {
+                btn.classList.remove('bg-white', 'text-slate-800', 'shadow-sm', 'font-semibold');
+                btn.classList.add('text-slate-600');
+            });
+            const activeBtn = document.getElementById(`filter-type-${type}`);
+            if (activeBtn) {
+                activeBtn.classList.add('bg-white', 'text-slate-800', 'shadow-sm', 'font-semibold');
+                activeBtn.classList.remove('text-slate-600');
+            }
+            applyFilters();
+        }
+
+        function setCategoryFilter(category) {
+            activeCategoryFilter = category;
+            document.querySelectorAll('.cat-pill').forEach(btn => {
+                if (btn.dataset.cat === category) {
+                    btn.classList.add('bg-slate-900', 'text-white');
+                    btn.classList.remove('bg-slate-100', 'text-slate-600');
+                } else {
+                    btn.classList.remove('bg-slate-900', 'text-white');
+                    btn.classList.add('bg-slate-100', 'text-slate-600');
+                }
+            });
+            applyFilters();
+        }
+
+        function filterByLocation(location) {
+            switchTab('feed');
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput) searchInput.value = location;
+            applyFilters();
+        }
+
+        function clearSearch() {
+            document.getElementById('searchInput').value = '';
+            applyFilters();
+        }
+
+        function applyFilters() {
+            const query = document.getElementById('searchInput').value.toLowerCase().trim();
+            const hideResolved = document.getElementById('hideResolvedCheck').checked;
+            const clearBtn = document.getElementById('clearSearchBtn');
+
+            if (clearBtn) {
+                if (query) clearBtn.classList.remove('hidden');
+                else clearBtn.classList.add('hidden');
+            }
+
+            const filtered = items.filter(item => {
+                if (activeTypeFilter !== 'all' && item.type !== activeTypeFilter) return false;
+                if (activeCategoryFilter !== 'all' && item.category !== activeCategoryFilter) return false;
+                if (hideResolved && item.resolved) return false;
+                
+                if (query) {
+                    const matchTitle = item.title.toLowerCase().includes(query);
+                    const matchLoc = item.location.toLowerCase().includes(query);
+                    const matchDesc = item.description.toLowerCase().includes(query);
+                    const matchKeeper = item.keeper.toLowerCase().includes(query);
+                    if (!matchTitle && !matchLoc && !matchDesc && !matchKeeper) return false;
+                }
+                return true;
+            });
+
+            renderItems(filtered);
+            updateStats();
+        }
+
+        function getCategoryIconClass(category) {
+            switch(category) {
+                case '전자기기': return 'fa-laptop';
+                case '지갑/카드': return 'fa-wallet';
+                case '의류/가방': return 'fa-shirt';
+                case '도서/문구': return 'fa-book';
+                default: return 'fa-box';
+            }
+        }
+
+        function renderItems(itemList) {
+            const grid = document.getElementById('itemsGrid');
+            const emptyState = document.getElementById('emptyState');
+            const countEl = document.getElementById('resultCount');
+
+            if (countEl) countEl.textContent = itemList.length;
+
+            if (itemList.length === 0) {
+                grid.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            grid.innerHTML = itemList.map(item => `
+                <div onclick="openDetailModal('${item.id}')" class="bg-white rounded-2xl overflow-hidden border border-slate-200/80 shadow-xs hover:shadow-md transition cursor-pointer flex flex-col relative group">
+                    
+                    <!-- Card Image & Overlay Badges -->
+                    <div class="relative h-40 bg-slate-100 overflow-hidden">
+                        <img src="${item.imageUrl}" alt="${item.title}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
+                        
+                        <div class="absolute top-2.5 left-2.5 flex gap-1.5 flex-wrap">
+                            ${item.type === 'found' 
+                                ? `<span class="bg-emerald-500/90 backdrop-blur-md text-white text-[11px] font-bold px-2 py-0.5 rounded-lg shadow-xs flex items-center gap-1"><i class="fa-solid fa-hand-holding-heart text-[10px]"></i> 습득물</span>`
+                                : `<span class="bg-rose-500/90 backdrop-blur-md text-white text-[11px] font-bold px-2 py-0.5 rounded-lg shadow-xs flex items-center gap-1"><i class="fa-solid fa-circle-question text-[10px]"></i> 분실물</span>`
+                            }
+                            ${item.resolved 
+                                ? `<span class="bg-slate-900/80 backdrop-blur-md text-white text-[11px] font-bold px-2 py-0.5 rounded-lg shadow-xs flex items-center gap-1"><i class="fa-solid fa-check text-[10px]"></i> 주인찾음 완료</span>`
+                                : ``
+                            }
+                        </div>
+
+                        <span class="absolute bottom-2.5 right-2.5 bg-slate-900/70 backdrop-blur-md text-white text-[10px] font-medium px-2 py-0.5 rounded-md flex items-center gap-1">
+                            <i class="fa-solid fa-location-dot text-[9px] text-rose-300"></i> ${item.location}
+                        </span>
+                    </div>
+
+                    <!-- Card Body -->
+                    <div class="p-3.5 flex-1 flex flex-col justify-between space-y-2">
+                        <div>
+                            <div class="flex justify-between items-center text-[11px] text-slate-400 mb-1">
+                                <span class="flex items-center gap-1"><i class="fa-solid ${getCategoryIconClass(item.category)} text-[10px]"></i> ${item.category}</span>
+                                <span>${item.date}</span>
+                            </div>
+                            <h3 class="font-bold text-xs text-slate-800 line-clamp-1 group-hover:text-brand-blue transition">
+                                ${escapeHtml(item.title)}
+                            </h3>
+                            <p class="text-[11px] text-slate-500 line-clamp-2 mt-1 leading-relaxed">
+                                ${escapeHtml(item.description)}
+                            </p>
+                        </div>
+
+                        <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+                            <span class="text-slate-600 font-medium truncate max-w-[150px] flex items-center gap-1">
+                                <i class="fa-solid fa-box-archive text-slate-400"></i> ${escapeHtml(item.keeper)}
+                            </span>
+                            <span class="flex items-center gap-1">
+                                <i class="fa-regular fa-comment"></i> ${item.comments ? item.comments.length : 0}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function openDetailModal(id) {
+            const item = items.find(i => i.id === id);
+            if (!item) return;
+
+            currentDetailItemId = id;
+
+            document.getElementById('modalImg').src = item.imageUrl;
+            document.getElementById('modalTitle').textContent = item.title;
+            document.getElementById('modalCategory').textContent = item.category;
+            document.getElementById('modalDate').textContent = item.date;
+            document.getElementById('modalLocation').textContent = item.location;
+            document.getElementById('modalKeeper').textContent = item.keeper;
+            document.getElementById('modalContact').textContent = item.contact || '미기재';
+            document.getElementById('modalDescription').textContent = item.description;
+
+            const badge = document.getElementById('modalTypeBadge');
+            if (item.type === 'found') {
+                badge.className = 'absolute top-3 left-3 px-2.5 py-1 rounded-lg text-xs font-bold text-white shadow-xs bg-emerald-500 flex items-center gap-1';
+                badge.innerHTML = '<i class="fa-solid fa-hand-holding-heart text-[11px]"></i> 습득물';
+            } else {
+                badge.className = 'absolute top-3 left-3 px-2.5 py-1 rounded-lg text-xs font-bold text-white shadow-xs bg-rose-500 flex items-center gap-1';
+                badge.innerHTML = '<i class="fa-solid fa-circle-question text-[11px]"></i> 분실물';
+            }
+
+            const toggleBtn = document.getElementById('toggleStatusBtn');
+            if (item.resolved) {
+                toggleBtn.className = 'flex-1 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs transition flex items-center justify-center gap-1.5';
+                toggleBtn.innerHTML = '<i class="fa-solid fa-rotate-left"></i> 찾음 완료 취소하기';
+            } else {
+                toggleBtn.className = 'flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl text-xs shadow-sm transition flex items-center justify-center gap-1.5';
+                toggleBtn.innerHTML = '<i class="fa-solid fa-check-double"></i> 주인 찾음 완료 처리';
+            }
+
+            renderComments(item);
+            openModal('detailModal');
+        }
+
+        function toggleItemStatusModal() {
+            if (!currentDetailItemId) return;
+            const item = items.find(i => i.id === currentDetailItemId);
+            if (item) {
+                item.resolved = !item.resolved;
+                saveItems();
+                openDetailModal(currentDetailItemId);
+                applyFilters();
+                showToast(item.resolved ? '주인 찾음 완료로 변경되었습니다.' : '찾음 상태가 취소되었습니다.');
+            }
+        }
+
+        function renderComments(item) {
+            const list = document.getElementById('commentsList');
+            const countEl = document.getElementById('commentCount');
+            const comments = item.comments || [];
+
+            countEl.textContent = comments.length;
+
+            if (comments.length === 0) {
+                list.innerHTML = `<p class="text-slate-400 text-[11px] py-2 text-center">작성된 제보나 댓글이 없습니다.</p>`;
+                return;
+            }
+
+            list.innerHTML = comments.map(c => `
+                <div class="bg-slate-50 p-2 rounded-lg flex justify-between items-start border border-slate-100">
+                    <span class="text-slate-700 font-medium">${escapeHtml(c.text)}</span>
+                    <span class="text-[10px] text-slate-400 whitespace-nowrap ml-2">${c.time}</span>
+                </div>
+            `).join('');
+        }
+
+        function addComment() {
+            const input = document.getElementById('commentInput');
+            const text = input.value.trim();
+            if (!text || !currentDetailItemId) return;
+
+            const item = items.find(i => i.id === currentDetailItemId);
+            if (item) {
+                if (!item.comments) item.comments = [];
+                item.comments.push({
+                    id: 'c-' + Date.now(),
+                    text: text,
+                    time: '방금 전'
+                });
+                saveItems();
+                renderComments(item);
+                input.value = '';
+                showToast('댓글 제보가 추가되었습니다.');
+            }
+        }
+
+        function renderMyItems() {
+            const grid = document.getElementById('myItemsGrid');
+            const myItems = items.filter(i => myItemIds.has(i.id));
+
+            if (myItems.length === 0) {
+                grid.innerHTML = `
+                    <div class="text-center py-8 text-slate-400 text-xs">
+                        내가 등록한 분실/습득물이 없습니다.
+                    </div>
+                `;
+                return;
+            }
+
+            grid.innerHTML = myItems.map(item => `
+                <div class="bg-slate-50 border border-slate-200/80 rounded-xl p-3 flex items-center justify-between gap-3 hover:bg-slate-100/50 transition">
+                    <div class="flex items-center gap-3 min-w-0 flex-1">
+                        <img src="${item.imageUrl}" class="w-12 h-12 rounded-lg object-cover bg-slate-200">
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-center gap-1.5 mb-0.5">
+                                <span class="text-[10px] px-1.5 py-0.2 rounded font-bold ${item.type === 'found' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">
+                                    ${item.type === 'found' ? '습득' : '분실'}
+                                </span>
+                                <span class="text-[11px] text-slate-400">${item.date}</span>
+                            </div>
+                            <h4 class="text-xs font-bold text-slate-800 truncate">${escapeHtml(item.title)}</h4>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <button onclick="openDetailModal('${item.id}')" class="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-50">
+                            보기
+                        </button>
+                        <button onclick="deleteMyItem('${item.id}')" class="p-1.5 text-slate-400 hover:text-rose-500 rounded-lg transition" title="삭제">
+                            <i class="fa-solid fa-trash-can text-xs"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function deleteMyItem(id) {
+            items = items.filter(i => i.id !== id);
+            myItemIds.delete(id);
+            saveItems();
+            renderMyItems();
+            applyFilters();
+            showToast('등록 항목이 삭제되었습니다.');
+        }
+
+        function updateStats() {
+            const todayStr = new Date().toISOString().split('T')[0];
+            const todayCount = items.filter(i => i.date === todayStr || (i.createdAt && (Date.now() - i.createdAt < 86400000))).length;
+            
+            const todayEl = document.getElementById('todayCount');
+            if (todayEl) todayEl.textContent = todayCount;
+        }
+
+        function updateLocationCounts() {
+            const locs = ['본관', '신관', '도서관', '체육관', '급식실', '운동장'];
+            locs.forEach(loc => {
+                const count = items.filter(i => i.location === loc && !i.resolved).length;
+                const el = document.getElementById(`count-loc-${loc}`);
+                if (el) el.textContent = count;
+            });
+        }
+
+        // Modal Utility
+        function openModal(id) {
+            const m = document.getElementById(id);
+            if (m) m.classList.remove('hidden');
+        }
+
+        function closeModal(id) {
+            const m = document.getElementById(id);
+            if (m) m.classList.add('hidden');
+        }
+
+        // Toast Message Utility
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMsg');
+            if (toast && toastMsg) {
+                toastMsg.textContent = msg;
+                toast.classList.remove('hidden');
+                setTimeout(() => {
+                    toast.classList.add('hidden');
+                }, 2500);
+            }
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text.replace(/&/g, "&amp;")
+                       .replace(/</g, "&lt;")
+                       .replace(/>/g, "&gt;")
+                       .replace(/"/g, "&quot;")
+                       .replace(/'/g, "&#039;");
+        }
+    </script>
+</body>
+</html>
