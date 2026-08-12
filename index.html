@@ -104,7 +104,7 @@
 
                 <button onclick="switchTab('upload')" class="bg-brand-coral hover:bg-brand-coralHover active:scale-95 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-xs transition flex items-center gap-1.5">
                     <i class="fa-solid fa-plus text-xs"></i>
-                    <span>물건 등록</span>
+                    <span>주운 물건 등록</span>
                 </button>
 
                 <button onclick="openModal('cloudModal')" class="p-2 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition" title="Supabase 연동 상태">
@@ -138,15 +138,16 @@
                     </button>
                 </div>
 
+                <!-- 상태 구분 필터 (기본값: 분실물 - 찾는 중) -->
                 <div class="grid grid-cols-3 gap-1.5 text-xs font-medium bg-slate-100 p-1 rounded-xl">
-                    <button onclick="setTypeFilter('all')" id="filter-type-all" class="type-filter-btn py-1.5 rounded-lg bg-white text-slate-800 shadow-xs text-center font-semibold transition">
-                        전체 보기
+                    <button onclick="setTypeFilter('lost')" id="filter-type-lost" class="type-filter-btn py-1.5 rounded-lg bg-white text-slate-800 shadow-xs text-center font-semibold transition">
+                        <i class="fa-solid fa-circle-question text-rose-500 mr-1"></i>분실물 (찾는 중)
                     </button>
                     <button onclick="setTypeFilter('found')" id="filter-type-found" class="type-filter-btn py-1.5 rounded-lg text-slate-600 hover:text-slate-900 text-center transition">
-                        <i class="fa-solid fa-hand-holding-heart text-emerald-500 mr-1"></i>습득물
+                        <i class="fa-solid fa-circle-check text-emerald-500 mr-1"></i>습득함 (주인 찾음)
                     </button>
-                    <button onclick="setTypeFilter('lost')" id="filter-type-lost" class="type-filter-btn py-1.5 rounded-lg text-slate-600 hover:text-slate-900 text-center transition">
-                        <i class="fa-solid fa-circle-question text-rose-500 mr-1"></i>분실물
+                    <button onclick="setTypeFilter('all')" id="filter-type-all" class="type-filter-btn py-1.5 rounded-lg text-slate-600 hover:text-slate-900 text-center transition">
+                        전체 보기
                     </button>
                 </div>
 
@@ -174,10 +175,6 @@
 
             <div class="flex justify-between items-center text-xs text-slate-500 px-1 pt-1">
                 <span>조회된 물건 <strong id="resultCount" class="text-slate-900 font-bold">0</strong>개</span>
-                <label class="flex items-center gap-1.5 cursor-pointer select-none">
-                    <input type="checkbox" id="hideResolvedCheck" onchange="applyFilters()" class="rounded border-slate-300 text-brand-blue focus:ring-brand-blue w-3.5 h-3.5">
-                    <span>주인 찾음 완료 항목 제외</span>
-                </label>
             </div>
 
             <div id="itemsGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-3.5"></div>
@@ -187,9 +184,9 @@
                     <i class="fa-solid fa-box-open"></i>
                 </div>
                 <h3 class="font-bold text-slate-700 text-sm mb-1">등록된 물건이 없습니다</h3>
-                <p class="text-xs text-slate-400 mb-4">조건을 변경하거나 새로운 분실/습득물을 등록해 보세요.</p>
+                <p class="text-xs text-slate-400 mb-4">조건을 변경하거나 주운 분실물을 등록해 보세요.</p>
                 <button onclick="switchTab('upload')" class="bg-brand-blue text-white text-xs font-semibold px-4 py-2 rounded-xl shadow-xs hover:bg-brand-blueDark transition">
-                    물건 등록하기
+                    주운 물건 등록하기
                 </button>
             </div>
         </section>
@@ -198,32 +195,19 @@
             <div class="bg-white rounded-2xl p-5 shadow-xs border border-slate-200/80">
                 <div class="flex items-center justify-between mb-4 border-b border-slate-100 pb-3">
                     <h2 class="font-bold text-slate-900 text-base flex items-center gap-2">
-                        <i class="fa-solid fa-file-circle-plus text-brand-coral"></i> 분실 / 습득물 등록
+                        <i class="fa-solid fa-hand-holding-heart text-emerald-500"></i> 습득물 등록 (주운 물건)
                     </h2>
                     <span class="text-[11px] text-slate-400">* 표시 항목 필수</span>
                 </div>
 
                 <form id="uploadForm" onsubmit="handleFormSubmit(event)" class="space-y-4">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">등록 구분 *</label>
-                        <div class="grid grid-cols-2 gap-2">
-                            <label class="cursor-pointer">
-                                <input type="radio" name="itemType" value="found" checked class="peer sr-only">
-                                <div class="p-3 text-center rounded-xl border border-slate-200 peer-checked:border-emerald-500 peer-checked:bg-emerald-50/60 peer-checked:text-emerald-700 font-semibold text-xs transition flex items-center justify-center gap-2">
-                                    <i class="fa-solid fa-hand-holding-heart text-emerald-500 text-sm"></i> 습득함 (주웠어요)
-                                </div>
-                            </label>
-                            <label class="cursor-pointer">
-                                <input type="radio" name="itemType" value="lost" class="peer sr-only">
-                                <div class="p-3 text-center rounded-xl border border-slate-200 peer-checked:border-rose-500 peer-checked:bg-rose-50/60 peer-checked:text-rose-700 font-semibold text-xs transition flex items-center justify-center gap-2">
-                                    <i class="fa-solid fa-circle-question text-rose-500 text-sm"></i> 분실함 (찾아요)
-                                </div>
-                            </label>
-                        </div>
+                    <div class="bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl p-3 text-xs flex items-center gap-2">
+                        <i class="fa-solid fa-circle-info text-emerald-600 text-sm"></i>
+                        <span>교내에서 습득하신 물건의 사진과 전달/보관 정보를 등록해 주시면 주인을 찾는 데 큰 도움이 됩니다.</span>
                     </div>
 
                     <div>
-                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">사진 첨부 (선택)</label>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1.5">사진 첨부 (권장)</label>
                         <div class="relative border-2 border-dashed border-slate-200 hover:border-slate-300 rounded-xl p-4 text-center hover:bg-slate-50/50 transition cursor-pointer" onclick="document.getElementById('imageInput').click()">
                             <input type="file" id="imageInput" accept="image/*" onchange="previewImage(event)" class="hidden">
                             
@@ -262,7 +246,7 @@
                             </select>
                         </div>
                         <div>
-                            <label for="itemLocation" class="block text-xs font-semibold text-slate-700 mb-1">발견 / 분실 장소 *</label>
+                            <label for="itemLocation" class="block text-xs font-semibold text-slate-700 mb-1">습득 장소 *</label>
                             <select id="itemLocation" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-brand-blue focus:bg-white transition">
                                 <option value="본관">본관 (교무실/교실)</option>
                                 <option value="신관">신관 (실습실/과학실)</option>
@@ -277,7 +261,7 @@
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
-                            <label for="itemDate" class="block text-xs font-semibold text-slate-700 mb-1">일시 *</label>
+                            <label for="itemDate" class="block text-xs font-semibold text-slate-700 mb-1">습득 일시 *</label>
                             <input type="date" id="itemDate" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-brand-blue focus:bg-white transition">
                         </div>
                         <div>
@@ -301,7 +285,7 @@
                             취소
                         </button>
                         <button type="submit" id="submitBtn" class="flex-1 py-3 bg-brand-coral hover:bg-brand-coralHover text-white font-bold rounded-xl text-xs shadow-xs transition flex items-center justify-center gap-1.5">
-                            <i class="fa-solid fa-check"></i> 등록하기
+                            <i class="fa-solid fa-check"></i> 습득물 등록하기
                         </button>
                     </div>
 
@@ -315,7 +299,7 @@
                     <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
                         <i class="fa-solid fa-map-location-dot text-brand-blue"></i> 교내 주요 구역별 현황
                     </h3>
-                    <p class="text-xs text-slate-400 mt-0.5">장소 카드를 클릭하면 해당 위치의 분실/습득물을 빠르게 필터링합니다.</p>
+                    <p class="text-xs text-slate-400 mt-0.5">장소 카드를 클릭하면 해당 위치의 찾고 있는 분실물을 빠르게 필터링합니다.</p>
                 </div>
 
                 <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
@@ -394,7 +378,7 @@
                     <h3 class="font-bold text-slate-900 text-sm flex items-center gap-2">
                         <i class="fa-solid fa-clock-rotate-left text-brand-blue"></i> 내가 등록한 내역
                     </h3>
-                    <p class="text-xs text-slate-400 mt-0.5">주인을 찾았거나 인계가 완료되었다면 '완료 처리'로 변경해 주세요.</p>
+                    <p class="text-xs text-slate-400 mt-0.5">주인을 찾았거나 인계가 완료되었다면 상세 화면에서 '주인 찾음 완료 처리'로 변경해 주세요.</p>
                 </div>
 
                 <div id="myItemsGrid" class="space-y-2"></div>
@@ -416,7 +400,7 @@
                     <i class="fa-solid fa-xmark"></i>
                 </button>
                 <span id="modalTypeBadge" class="absolute top-3 left-3 px-2.5 py-1 rounded-lg text-xs font-bold text-white shadow-xs">
-                    습득물
+                    분실물
                 </span>
             </div>
 
@@ -432,11 +416,11 @@
 
                 <div class="bg-slate-50 rounded-xl p-3 space-y-2 text-xs border border-slate-100">
                     <div class="flex items-start">
-                        <span class="w-20 font-semibold text-slate-500 flex items-center gap-1.5"><i class="fa-solid fa-location-dot text-rose-500 w-3"></i> 장소:</span>
+                        <span class="w-20 font-semibold text-slate-500 flex items-center gap-1.5"><i class="fa-solid fa-location-dot text-rose-500 w-3"></i> 습득장소:</span>
                         <span id="modalLocation" class="font-medium text-slate-800 flex-1">본관</span>
                     </div>
                     <div class="flex items-start">
-                        <span class="w-20 font-semibold text-slate-500 flex items-center gap-1.5"><i class="fa-solid fa-box-archive text-amber-500 w-3"></i> 보관:</span>
+                        <span class="w-20 font-semibold text-slate-500 flex items-center gap-1.5"><i class="fa-solid fa-box-archive text-amber-500 w-3"></i> 보관위치:</span>
                         <span id="modalKeeper" class="font-medium text-slate-800 flex-1">교무실</span>
                     </div>
                     <div class="flex items-start">
@@ -469,11 +453,8 @@
 
                 <div class="pt-2 flex gap-2">
                     <button id="toggleStatusBtn" onclick="toggleItemStatusModal()" class="flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl text-xs shadow-xs transition flex items-center justify-center gap-1.5">
-                        <i class="fa-solid fa-check-double"></i> 주인 찾음 완료 처리
+                        <i class="fa-solid fa-check-double"></i> 주인 찾음 완료 처리 (습득함으로 이동)
                     </button>
-                    <div id="noPermissionMsg" class="hidden flex-1 py-2.5 bg-slate-100 text-slate-400 font-medium rounded-xl text-xs text-center border border-slate-200 flex items-center justify-center gap-1.5">
-                        <i class="fa-solid fa-lock text-slate-400"></i> 등록자만 완료 처리할 수 있습니다
-                    </div>
                 </div>
             </div>
         </div>
@@ -538,39 +519,36 @@
             },
             {
                 id: 'item-2',
-                type: 'lost',
+                type: 'found',
                 title: '검은색 가죽 지갑 (학생증 포함)',
                 category: '지갑/카드',
                 location: '급식실',
                 date: '2026-08-12',
-                keeper: '발견하신 분은 연락 부탁드립니다',
-                description: '점심시간 급식실 퇴식구 근처에서 분실한 것 같습니다. 내부 학생증과 버스카드가 들어있습니다.',
+                keeper: '급식실 퇴식구 옆 보관함',
+                description: '점심시간 급식실 퇴식구 근처에서 주웠습니다. 내부 학생증과 버스카드가 들어있습니다.',
                 contact: '010-1234-5678',
                 imageUrl: 'https://images.unsplash.com/photo-1627123424574-724758594e93?w=500&auto=format&fit=crop&q=60',
-                resolved: false,
+                resolved: true,
                 createdAt: Date.now() - 3600000 * 5,
                 comments: []
             }
         ];
 
         let items = [];
-        let activeTypeFilter = 'all'; 
+        let activeTypeFilter = 'lost'; // 기본값: 주인을 찾지 못한 '분실물'만 보기
         let activeCategoryFilter = 'all';
         let currentDetailItemId = null;
         let selectedImageBase64 = null;
         let selectedFileObj = null;
         let myItemIds = new Set();
+        let myCommentIds = new Set();
 
         window.addEventListener('DOMContentLoaded', () => {
             initCurrentDate();
             loadMyItemIds();
+            loadMyCommentIds();
             loadItems();
             setupRealtimeSubscription();
-
-            // 완료 후 1시간 지난 항목 자동 숨김을 위한 30초 주기 타이머
-            setInterval(() => {
-                applyFilters();
-            }, 30000);
         });
 
         function initCurrentDate() {
@@ -582,14 +560,23 @@
         function loadMyItemIds() {
             const savedMyIds = localStorage.getItem('foundit_my_items');
             if (savedMyIds) {
-                try {
-                    myItemIds = new Set(JSON.parse(savedMyIds));
-                } catch(e) {}
+                try { myItemIds = new Set(JSON.parse(savedMyIds)); } catch(e) {}
             }
         }
 
         function saveMyItemIds() {
             localStorage.setItem('foundit_my_items', JSON.stringify([...myItemIds]));
+        }
+
+        function loadMyCommentIds() {
+            const savedCommentIds = localStorage.getItem('foundit_my_comments');
+            if (savedCommentIds) {
+                try { myCommentIds = new Set(JSON.parse(savedCommentIds)); } catch(e) {}
+            }
+        }
+
+        function saveMyCommentIds() {
+            localStorage.setItem('foundit_my_comments', JSON.stringify([...myCommentIds]));
         }
 
         async function loadItems() {
@@ -602,8 +589,8 @@
 
                     if (!error && data) {
                         items = data.map(item => ({
-                            id: item.id,
-                            type: item.type,
+                            id: String(item.id),
+                            type: item.type || 'found',
                             title: item.title,
                             category: item.category,
                             location: item.location,
@@ -612,24 +599,23 @@
                             description: item.description,
                             contact: item.contact,
                             imageUrl: item.image_url || getCategoryDefaultImg(item.category),
-                            resolved: item.resolved || false,
-                            resolvedAt: item.resolved_at ? new Date(item.resolved_at).getTime() : null,
+                            resolved: Boolean(item.resolved),
                             createdAt: item.created_at ? new Date(item.created_at).getTime() : Date.now(),
                             comments: item.comments || []
                         }));
                         applyFilters();
                         updateLocationCounts();
 
-                        // 상세 모달이 열려있는 상태라면 실시간으로 댓글 및 데이터 갱신
                         if (currentDetailItemId) {
                             const curItem = items.find(i => String(i.id) === String(currentDetailItemId));
                             if (curItem) {
                                 renderComments(curItem);
+                                updateModalStatusButton(curItem);
                             }
                         }
                         return;
                     } else if (error) {
-                        console.warn('Supabase lost_items table error/not created yet:', error.message);
+                        console.warn('Supabase lost_items query:', error.message);
                     }
                 } catch(e) {
                     console.error('Supabase query error:', e);
@@ -692,7 +678,7 @@
             }
         }
 
-        // 이미지 클라이언트 측 고화질 압축 함수 (Canvas API 기반)
+        // 이미지 압축
         function compressImage(file, maxWidth = 1200, maxHeight = 1200, quality = 0.85) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -708,7 +694,7 @@
                                 width = maxWidth;
                             } else {
                                 width = Math.round((width * maxHeight) / height);
-                                height = maxHeight;
+                                width = maxWidth;
                             }
                         }
 
@@ -763,18 +749,17 @@
                 document.getElementById('previewContainer').classList.remove('hidden');
                 placeholder.classList.add('hidden');
 
-                // 압축율 계산 및 사용자 안내
                 const origMb = (result.origSize / (1024 * 1024)).toFixed(2);
                 const compKb = (result.compSize / 1024).toFixed(0);
                 const savedPercent = Math.max(0, Math.round((1 - result.compSize / result.origSize) * 100));
 
                 const infoEl = document.getElementById('compressionInfo');
                 if (infoEl) {
-                    infoEl.textContent = `⚡ 이미지 최적화 완료: ${origMb}MB → ${compKb}KB (${savedPercent}% 용량 절감)`;
+                    infoEl.textContent = `⚡ 최적화 완료: ${origMb}MB → ${compKb}KB (${savedPercent}% 용량 절감)`;
                     infoEl.classList.remove('hidden');
                 }
             } catch (e) {
-                console.warn('Image compression failed, fallback to original:', e);
+                console.warn('Image compression fallback:', e);
                 selectedFileObj = file;
                 const reader = new FileReader();
                 reader.onload = function(e) {
@@ -810,7 +795,7 @@
             submitBtn.disabled = true;
             submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> 저장 중...`;
 
-            const type = document.querySelector('input[name="itemType"]:checked').value;
+            const type = 'found';
             const title = document.getElementById('itemTitle').value.trim();
             const category = document.getElementById('itemCategory').value;
             const location = document.getElementById('itemLocation').value;
@@ -866,9 +851,10 @@
                         .select();
 
                     if (!error && data && data.length > 0) {
-                        myItemIds.add(data[0].id);
+                        const newId = String(data[0].id);
+                        myItemIds.add(newId);
                         saveMyItemIds();
-                        showToast('Supabase에 성공적으로 저장되었습니다!');
+                        showToast('습득물이 성공적으로 등록되었습니다!');
                         finishSubmission();
                         return;
                     }
@@ -877,8 +863,9 @@
                 }
             }
 
+            const localId = 'item-' + Date.now();
             const newItem = {
-                id: 'item-' + Date.now(),
+                id: localId,
                 type, title, category, location, date, keeper,
                 description: description || '등록된 상세 설명이 없습니다.',
                 contact: contact || '상세 문의는 댓글을 이용해 주세요.',
@@ -888,16 +875,16 @@
                 comments: []
             };
             items.unshift(newItem);
-            myItemIds.add(newItem.id);
+            myItemIds.add(localId);
             saveMyItemIds();
             localStorage.setItem('foundit_items', JSON.stringify(items));
-            showToast('로컬에 저장되었습니다.');
+            showToast('로컬에 습득물이 등록되었습니다.');
 
             finishSubmission();
 
             function finishSubmission() {
                 submitBtn.disabled = false;
-                submitBtn.innerHTML = `<i class="fa-solid fa-check"></i> 등록하기`;
+                submitBtn.innerHTML = `<i class="fa-solid fa-check"></i> 습득물 등록하기`;
                 document.getElementById('uploadForm').reset();
                 removeImage();
                 initCurrentDate();
@@ -958,7 +945,6 @@
 
         function applyFilters() {
             const query = document.getElementById('searchInput').value.toLowerCase().trim();
-            const hideResolved = document.getElementById('hideResolvedCheck').checked;
             const clearBtn = document.getElementById('clearSearchBtn');
 
             if (clearBtn) {
@@ -966,19 +952,17 @@
                 else clearBtn.classList.add('hidden');
             }
 
-            const ONE_HOUR_MS = 60 * 60 * 1000;
-            const now = Date.now();
-
             const filtered = items.filter(item => {
-                // 1시간 뒤 자동 숨김 처리: 완료 상태이고 처리 시각부터 1시간(3600초)이 경과했다면 피드에서 자동 제외
-                if (item.resolved && item.resolvedAt && (now - item.resolvedAt > ONE_HOUR_MS)) {
-                    return false;
-                }
+                // 1. 상태별 엄격 분리
+                // - 분실물 (lost): 주인을 찾지 못한 분실물만 표시 (resolved === false)
+                // - 습득함 (found): 주인을 찾아 인계 완료된 물건만 표시 (resolved === true)
+                if (activeTypeFilter === 'lost' && item.resolved) return false;
+                if (activeTypeFilter === 'found' && !item.resolved) return false;
 
-                if (activeTypeFilter !== 'all' && item.type !== activeTypeFilter) return false;
+                // 2. 카테고리 필터
                 if (activeCategoryFilter !== 'all' && item.category !== activeCategoryFilter) return false;
-                if (hideResolved && item.resolved) return false;
                 
+                // 3. 키워드 검색
                 if (query) {
                     const matchTitle = item.title.toLowerCase().includes(query);
                     const matchLoc = item.location.toLowerCase().includes(query);
@@ -1023,13 +1007,9 @@
                         <img src="${item.imageUrl}" alt="${escapeHtml(item.title)}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
                         
                         <div class="absolute top-2.5 left-2.5 flex gap-1.5 flex-wrap">
-                            ${item.type === 'found' 
-                                ? `<span class="bg-emerald-500/90 backdrop-blur-md text-white text-[11px] font-bold px-2 py-0.5 rounded-lg shadow-xs flex items-center gap-1"><i class="fa-solid fa-hand-holding-heart text-[10px]"></i> 습득물</span>`
-                                : `<span class="bg-rose-500/90 backdrop-blur-md text-white text-[11px] font-bold px-2 py-0.5 rounded-lg shadow-xs flex items-center gap-1"><i class="fa-solid fa-circle-question text-[10px]"></i> 분실물</span>`
-                            }
                             ${item.resolved 
-                                ? `<span class="bg-slate-900/80 backdrop-blur-md text-white text-[11px] font-bold px-2 py-0.5 rounded-lg shadow-xs flex items-center gap-1"><i class="fa-solid fa-check text-[10px]"></i> 주인찾음 완료</span>`
-                                : ``
+                                ? `<span class="bg-emerald-600/90 backdrop-blur-md text-white text-[11px] font-bold px-2 py-0.5 rounded-lg shadow-xs flex items-center gap-1"><i class="fa-solid fa-circle-check text-[10px]"></i> 습득함 (주인 찾음)</span>`
+                                : `<span class="bg-rose-500/90 backdrop-blur-md text-white text-[11px] font-bold px-2 py-0.5 rounded-lg shadow-xs flex items-center gap-1"><i class="fa-solid fa-circle-question text-[10px]"></i> 분실물 (찾는 중)</span>`
                             }
                         </div>
 
@@ -1069,7 +1049,7 @@
             const item = items.find(i => String(i.id) === String(id));
             if (!item) return;
 
-            currentDetailItemId = id;
+            currentDetailItemId = String(id);
 
             document.getElementById('modalImg').src = item.imageUrl;
             document.getElementById('modalTitle').textContent = item.title;
@@ -1081,74 +1061,71 @@
             document.getElementById('modalDescription').textContent = item.description;
 
             const badge = document.getElementById('modalTypeBadge');
-            if (item.type === 'found') {
-                badge.className = 'absolute top-3 left-3 px-2.5 py-1 rounded-lg text-xs font-bold text-white shadow-xs bg-emerald-500 flex items-center gap-1';
-                badge.innerHTML = '<i class="fa-solid fa-hand-holding-heart text-[11px]"></i> 습득물';
+            if (item.resolved) {
+                badge.className = 'absolute top-3 left-3 px-2.5 py-1 rounded-lg text-xs font-bold text-white shadow-xs bg-emerald-600 flex items-center gap-1';
+                badge.innerHTML = '<i class="fa-solid fa-circle-check text-[11px]"></i> 습득함 (주인 찾음 완료)';
             } else {
                 badge.className = 'absolute top-3 left-3 px-2.5 py-1 rounded-lg text-xs font-bold text-white shadow-xs bg-rose-500 flex items-center gap-1';
-                badge.innerHTML = '<i class="fa-solid fa-circle-question text-[11px]"></i> 분실물';
+                badge.innerHTML = '<i class="fa-solid fa-circle-question text-[11px]"></i> 분실물 (주인 찾는 중)';
             }
 
-            // 본인 작성글 판단 및 완료 버튼 처리
-            const isOwner = myItemIds.has(String(item.id));
-            const toggleBtn = document.getElementById('toggleStatusBtn');
-            const noPermMsg = document.getElementById('noPermissionMsg');
-
-            if (isOwner) {
-                toggleBtn.classList.remove('hidden');
-                if (noPermMsg) noPermMsg.classList.add('hidden');
-
-                if (item.resolved) {
-                    toggleBtn.className = 'flex-1 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-xl text-xs transition flex items-center justify-center gap-1.5';
-                    toggleBtn.innerHTML = '<i class="fa-solid fa-rotate-left"></i> 찾음 완료 취소하기';
-                } else {
-                    toggleBtn.className = 'flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl text-xs shadow-xs transition flex items-center justify-center gap-1.5';
-                    toggleBtn.innerHTML = '<i class="fa-solid fa-check-double"></i> 주인 찾음 완료 처리';
-                }
-            } else {
-                toggleBtn.classList.add('hidden');
-                if (noPermMsg) noPermMsg.classList.remove('hidden');
-            }
-
+            updateModalStatusButton(item);
             renderComments(item);
             openModal('detailModal');
+        }
+
+        function updateModalStatusButton(item) {
+            const toggleBtn = document.getElementById('toggleStatusBtn');
+            if (!toggleBtn) return;
+
+            if (item.resolved) {
+                toggleBtn.className = 'flex-1 py-2.5 bg-slate-700 hover:bg-slate-800 text-white font-bold rounded-xl text-xs shadow-xs transition flex items-center justify-center gap-1.5';
+                toggleBtn.innerHTML = '<i class="fa-solid fa-rotate-left"></i> 주인 찾음 완료 취소 (분실물 목록으로 이동)';
+            } else {
+                toggleBtn.className = 'flex-1 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl text-xs shadow-xs transition flex items-center justify-center gap-1.5';
+                toggleBtn.innerHTML = '<i class="fa-solid fa-check-double"></i> 주인 찾음 완료 처리 (습득함으로 이동)';
+            }
         }
 
         async function toggleItemStatusModal() {
             if (!currentDetailItemId) return;
 
-            // 작성자 권한 검증
-            if (!myItemIds.has(String(currentDetailItemId))) {
-                showToast('등록자 본인만 완료 처리할 수 있습니다.');
-                return;
+            const item = items.find(i => String(i.id) === String(currentDetailItemId));
+            if (!item) return;
+
+            const newStatus = !item.resolved;
+            
+            // 1. Local state update
+            item.resolved = newStatus;
+
+            // 2. Supabase DB update
+            if (supabaseClient) {
+                try {
+                    const { error } = await supabaseClient
+                        .from('lost_items')
+                        .update({ resolved: newStatus })
+                        .eq('id', currentDetailItemId);
+                    
+                    if (error) {
+                        console.warn('Supabase status update warning:', error.message);
+                    }
+                } catch(e) {
+                    console.error('Supabase status update error:', e);
+                }
             }
 
-            const item = items.find(i => String(i.id) === String(currentDetailItemId));
-            if (item) {
-                const newStatus = !item.resolved;
-                const resolvedAtIso = newStatus ? new Date().toISOString() : null;
+            // 3. LocalStorage sync
+            localStorage.setItem('foundit_items', JSON.stringify(items));
 
-                item.resolved = newStatus;
-                item.resolvedAt = newStatus ? Date.now() : null;
-
-                if (supabaseClient) {
-                    try {
-                        await supabaseClient
-                            .from('lost_items')
-                            .update({ 
-                                resolved: newStatus,
-                                resolved_at: resolvedAtIso
-                            })
-                            .eq('id', currentDetailItemId);
-                    } catch(e) {
-                        console.warn('Supabase update failed:', e);
-                    }
-                }
-
-                localStorage.setItem('foundit_items', JSON.stringify(items));
-                openDetailModal(currentDetailItemId);
-                applyFilters();
-                showToast(newStatus ? '주인 찾음 완료로 변경되었습니다. (1시간 뒤 피드에서 자동 삭제)' : '찾음 상태가 취소되었습니다.');
+            // 4. UI refresh
+            openDetailModal(currentDetailItemId);
+            applyFilters();
+            updateLocationCounts();
+            
+            if (newStatus) {
+                showToast('주인을 찾았습니다! 습득함 목록으로 이동되었습니다.');
+            } else {
+                showToast('주인 찾음 상태가 취소되어 분실물 목록으로 이동했습니다.');
             }
         }
 
@@ -1164,12 +1141,22 @@
                 return;
             }
 
-            list.innerHTML = comments.map(c => `
-                <div class="bg-slate-50 p-2 rounded-lg flex justify-between items-start border border-slate-100">
-                    <span class="text-slate-700 font-medium">${escapeHtml(c.text)}</span>
-                    <span class="text-[10px] text-slate-400 whitespace-nowrap ml-2">${c.time}</span>
-                </div>
-            `).join('');
+            list.innerHTML = comments.map(c => {
+                const isMyComment = myCommentIds.has(String(c.id));
+                return `
+                    <div class="bg-slate-50 p-2 rounded-lg flex justify-between items-center border border-slate-100 group">
+                        <span class="text-slate-700 font-medium text-xs break-all flex-1 pr-2">${escapeHtml(c.text)}</span>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <span class="text-[10px] text-slate-400 whitespace-nowrap">${c.time || '방금 전'}</span>
+                            ${isMyComment ? `
+                                <button onclick="deleteComment('${c.id}')" class="text-slate-300 hover:text-rose-500 p-1 transition" title="내 댓글 삭제">
+                                    <i class="fa-solid fa-trash-can text-[11px]"></i>
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
         }
 
         async function addComment() {
@@ -1180,19 +1167,55 @@
             const item = items.find(i => String(i.id) === String(currentDetailItemId));
             if (item) {
                 if (!item.comments) item.comments = [];
-                const newComment = { id: 'c-' + Date.now(), text: text, time: '방금 전' };
+                
+                const newCommentId = 'c-' + Date.now();
+                const newComment = { id: newCommentId, text: text, time: '방금 전' };
                 item.comments.push(newComment);
 
+                myCommentIds.add(newCommentId);
+                saveMyCommentIds();
+
                 if (supabaseClient) {
-                    await supabaseClient
-                        .from('lost_items')
-                        .update({ comments: item.comments })
-                        .eq('id', currentDetailItemId);
+                    try {
+                        await supabaseClient
+                            .from('lost_items')
+                            .update({ comments: item.comments })
+                            .eq('id', currentDetailItemId);
+                    } catch(e) {
+                        console.warn('Supabase comment add error:', e);
+                    }
                 }
 
+                localStorage.setItem('foundit_items', JSON.stringify(items));
                 renderComments(item);
                 input.value = '';
-                showToast('댓글 제보가 추가되었습니다.');
+                showToast('댓글 제보가 등록되었습니다.');
+            }
+        }
+
+        async function deleteComment(commentId) {
+            if (!currentDetailItemId) return;
+
+            const item = items.find(i => String(i.id) === String(currentDetailItemId));
+            if (item && item.comments) {
+                item.comments = item.comments.filter(c => String(c.id) !== String(commentId));
+                myCommentIds.delete(String(commentId));
+                saveMyCommentIds();
+
+                if (supabaseClient) {
+                    try {
+                        await supabaseClient
+                            .from('lost_items')
+                            .update({ comments: item.comments })
+                            .eq('id', currentDetailItemId);
+                    } catch(e) {
+                        console.warn('Supabase comment delete error:', e);
+                    }
+                }
+
+                localStorage.setItem('foundit_items', JSON.stringify(items));
+                renderComments(item);
+                showToast('댓글이 삭제되었습니다.');
             }
         }
 
@@ -1201,7 +1224,7 @@
             const myItems = items.filter(i => myItemIds.has(String(i.id)));
 
             if (myItems.length === 0) {
-                grid.innerHTML = `<div class="text-center py-8 text-slate-400 text-xs">내가 등록한 분실/습득물이 없습니다.</div>`;
+                grid.innerHTML = `<div class="text-center py-8 text-slate-400 text-xs">내가 등록한 습득물이 없습니다.</div>`;
                 return;
             }
 
@@ -1211,8 +1234,8 @@
                         <img src="${item.imageUrl}" class="w-12 h-12 rounded-lg object-cover bg-slate-200">
                         <div class="min-w-0 flex-1">
                             <div class="flex items-center gap-1.5 mb-0.5">
-                                <span class="text-[10px] px-1.5 py-0.2 rounded font-bold ${item.type === 'found' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">
-                                    ${item.type === 'found' ? '습득' : '분실'}
+                                <span class="text-[10px] px-1.5 py-0.2 rounded font-bold ${item.resolved ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}">
+                                    ${item.resolved ? '습득함 (주인 찾음)' : '분실물 (찾는 중)'}
                                 </span>
                                 <span class="text-[11px] text-slate-400">${item.date}</span>
                             </div>
@@ -1290,3 +1313,13 @@
     </script>
 </body>
 </html>
+```eoc
+
+### 주요 변경 사항
+
+1. **기본 필터 전환**: 앱에 처음 접속하면 **`분실물 (찾는 중)`** 탭이 기본으로 활성화되도록 초기 설정했습니다 (`activeTypeFilter = 'lost'`).
+2. **엄격한 상태 분리**:
+   - **`분실물 (찾는 중)`** 탭: 아직 주인을 찾지 못한 항목만 필터링되어 나타납니다 (`resolved === false`).
+   - **`습득함 (주인 찾음)`** 탭: 인계가 완료되어 주인을 찾은 항목만 모아서 보여줍니다 (`resolved === true`).
+   - **`전체 보기`** 탭: 주인을 찾은 물건과 찾는 물건을 상태 뱃지 구분과 함께 전체 조회할 수 있습니다.
+3. **상태 전환 반응 연동**: 상세 모달에서 `'주인 찾음 완료 처리'` 버튼을 누르면 해당 물건이 분실물 목록에서 즉시 사라져 **`습득함`** 탭으로 자동 이동됩니다.
