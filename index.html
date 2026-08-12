@@ -589,22 +589,6 @@
         function saveMyCommentIds() {
             localStorage.setItem('findit_my_comments', JSON.stringify([...myCommentIds]));
         }
-        }
-
-        function saveMyItemIds() {
-            localStorage.setItem('foundit_my_items', JSON.stringify([...myItemIds]));
-        }
-
-        function loadMyCommentIds() {
-            const savedCommentIds = localStorage.getItem('foundit_my_comments');
-            if (savedCommentIds) {
-                try { myCommentIds = new Set(JSON.parse(savedCommentIds)); } catch(e) {}
-            }
-        }
-
-        function saveMyCommentIds() {
-            localStorage.setItem('foundit_my_comments', JSON.stringify([...myCommentIds]));
-        }
 
         async function loadItems() {
             if (supabaseClient) {
@@ -650,7 +634,7 @@
             }
 
             // Fallback to local storage or mock
-            const saved = localStorage.getItem('foundit_items');
+            const saved = localStorage.getItem('findit_items');
             if (saved) {
                 try { items = JSON.parse(saved); } catch (e) { items = [...MOCK_ITEMS]; }
             } else {
@@ -1175,6 +1159,111 @@
                         <span class="text-[10px] text-slate-400 whitespace-nowrap">${c.time || '방금 전'}</span>
                         <button onclick="deleteComment('${c.id}')" class="text-slate-300 hover:text-rose-500 p-1 transition" title="댓글 삭제">
                             <i class="fa-solid fa-trash-can text-[11px]"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function addComment() {
+            if (!currentDetailItemId) return;
+
+            const input = document.getElementById('commentInput');
+            const text = input ? input.value.trim() : '';
+            if (!text) return;
+
+            const item = items.find(i => String(i.id) === String(currentDetailItemId));
+            if (!item) return;
+
+            const commentId = 'c_' + Date.now();
+            const newComment = {
+                id: commentId,
+                text: text,
+                time: '방금 전'
+            };
+
+            if (!item.comments) item.comments = [];
+            item.comments.push(newComment);
+            myCommentIds.add(commentId);
+            saveMyCommentIds();
+
+            if (supabaseClient) {
+                try {
+                    await supabaseClient
+                        .from('lost_items')
+                        .update({ comments: item.comments })
+                        .eq('id', currentDetailItemId);
+                } catch (e) {
+                    console.error('Supabase comment update error:', e);
+                }
+            }
+
+            localStorage.setItem('findit_items', JSON.stringify(items));
+            if (input) input.value = '';
+            renderComments(item);
+            applyFilters();
+            showToast('댓글이 등록되었습니다.');
+        }
+
+        async function deleteComment(commentId) {
+            if (!currentDetailItemId) return;
+
+            const item = items.find(i => String(i.id) === String(currentDetailItemId));
+            if (!item || !item.comments) return;
+
+            item.comments = item.comments.filter(c => String(c.id) !== String(commentId));
+
+            if (supabaseClient) {
+                try {
+                    await supabaseClient
+                        .from('lost_items')
+                        .update({ comments: item.comments })
+                        .eq('id', currentDetailItemId);
+                } catch (e) {
+                    console.error('Supabase comment delete error:', e);
+                }
+            }
+
+            localStorage.setItem('findit_items', JSON.stringify(items));
+            renderComments(item);
+            applyFilters();
+            showToast('댓글이 삭제되었습니다.');
+        }
+
+        function renderMyItems() {
+            const grid = document.getElementById('myItemsGrid');
+            if (!grid) return;
+
+            const myItems = items.filter(item => myItemIds.has(String(item.id)));
+
+            if (myItems.length === 0) {
+                grid.innerHTML = `
+                    <div class="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-200 p-4">
+                        <i class="fa-solid fa-box-open text-slate-300 text-2xl mb-2"></i>
+                        <p class="text-xs text-slate-500">내가 등록한 내역이 없습니다.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            grid.innerHTML = myItems.map(item => `
+                <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-3 overflow-hidden">
+                        <img src="${item.imageUrl}" class="w-12 h-12 rounded-lg object-cover shrink-0">
+                        <div class="min-w-0">
+                            <h4 class="text-xs font-bold text-slate-800 truncate">${escapeHtml(item.title)}</h4>
+                            <p class="text-[11px] text-slate-400">${item.date} • ${escapeHtml(item.location)}</p>
+                            <span class="text-[10px] ${item.resolved ? 'text-emerald-600' : 'text-rose-500'} font-semibold">
+                                ${item.resolved ? '✓ 주인 찾음 완료' : '? 주인 찾는 중'}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <button onclick="openDetailModal('${item.id}')" class="px-2.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-medium rounded-lg transition">
+                            상세
+                        </button>
+                        <button onclick="deleteMyItem('${item.id}')" class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition" title="삭제">
+                            <i class="fa-solid fa-trash-can text-xs"></i>
                         </button>
                     </div>
                 </div>
